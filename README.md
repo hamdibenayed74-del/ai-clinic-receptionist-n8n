@@ -39,9 +39,7 @@ The project simulates an AI-powered clinic receptionist capable of understanding
 ---
 
 # 🏗️ Architecture
-
-> *(Architecture diagram will be added here.)*
-
+https://github.com/hamdibenayed74-del/ai-clinic-receptionist-n8n/blob/main/architecture.png.png?raw=true
 ---
 
 # 📂 Workflow Overview
