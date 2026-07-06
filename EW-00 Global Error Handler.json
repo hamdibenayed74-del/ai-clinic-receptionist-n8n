@@ -1,0 +1,195 @@
+{
+  "name": "EW-00 Global Error Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "EW-00 Global Error Handler\n\nPurpose\n\nCentralizes error processing for all workflows.\n\nResponsibilities\n\n• Normalize errors\n• Classify severity\n• Log incidents\n• Trigger notifications\n• Return standardized error responses\n\nConsumers\n\n• All project workflows",
+        "height": 384,
+        "width": 400
+      },
+      "id": "112c93c9-8128-4a8c-a52b-09e00bff4307",
+      "name": "Module Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters_width_note": "n8n renders width/height via separate fields below",
+      "notesRenderNote": true
+    },
+    {
+      "parameters": {},
+      "id": "a7e45877-e1d8-4fbf-b5df-0b7a93fa358a",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst execution = input.execution || {};\nconst workflowInfo = input.workflow || {};\nconst executionError = execution.error || input.trigger || {};\nconst customData = execution.customData || {};\n\nconst correlationId = customData.correlation_id || input.correlation_id || null;\nconst patientPhone = customData.patient_phone || input.patient_phone || null;\nconst channel = customData.channel || input.channel || null;\n\nconst errorMessage = executionError.message || input.errorMessage || 'Unknown error';\nconst stackTrace = executionError.stack || null;\nconst nodeName = execution.lastNodeExecuted || (input.node && input.node.name) || 'unknown';\nconst workflowName = workflowInfo.name || 'unknown';\nconst executionId = execution.id || 'unknown';\nconst timestamp = new Date().toISOString();\n\nreturn [{\n  json: {\n    timestamp,\n    correlation_id: correlationId,\n    workflow: workflowName,\n    node: nodeName,\n    patient_phone: patientPhone,\n    channel,\n    error_message: errorMessage,\n    stack_trace: stackTrace,\n    execution_id: executionId,\n    raw_error: JSON.stringify(input)\n  }\n}];"
+      },
+      "id": "dda37c39-3ba1-407f-9a97-a6315e00b6b3",
+      "name": "Normalize ErrorEvent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst message = (item.error_message || '').toString();\n\nconst recoverablePatterns = [\n  /\\b429\\b/,\n  /rate limit/i,\n  /timeout/i,\n  /timed out/i,\n  /ETIMEDOUT/,\n  /ECONNRESET/,\n  /ECONNREFUSED/,\n  /EAI_AGAIN/,\n  /temporarily unavailable/i,\n  /service unavailable/i,\n  /\\b502\\b/,\n  /\\b503\\b/,\n  /\\b504\\b/\n];\n\nconst nonRecoverablePatterns = [\n  /bad workflow contract/i,\n  /missing required field/i,\n  /json parsing/i,\n  /unexpected token/i,\n  /validation error/i,\n  /logic error/i,\n  /invalid value/i\n];\n\nlet recoverable = false;\nif (nonRecoverablePatterns.some((p) => p.test(message))) {\n  recoverable = false;\n} else if (recoverablePatterns.some((p) => p.test(message))) {\n  recoverable = true;\n}\n\nlet errorType = 'unclassified';\nif (/\\b429\\b/.test(message) || /rate limit/i.test(message)) errorType = 'rate_limit';\nelse if (/timeout|timed out|ETIMEDOUT/i.test(message)) errorType = 'timeout';\nelse if (/50[234]/.test(message) || /unavailable/i.test(message)) errorType = 'temporary_api_outage';\nelse if (/bad workflow contract/i.test(message)) errorType = 'contract_violation';\nelse if (/missing required field/i.test(message)) errorType = 'missing_field';\nelse if (/json parsing|unexpected token/i.test(message)) errorType = 'parsing_error';\nelse if (/logic error/i.test(message)) errorType = 'logic_error';\n\nreturn [{\n  json: {\n    ...item,\n    recoverable,\n    error_type: errorType\n  }\n}];"
+      },
+      "id": "e15b4f47-c40e-4155-880b-54a63f3d9c36",
+      "name": "Classify Recoverability",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SHEET_DOCUMENT_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "ErrorLog",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $json.timestamp }}",
+            "CorrelationID": "={{ $json.correlation_id }}",
+            "Workflow": "={{ $json.workflow }}",
+            "Node": "={{ $json.node }}",
+            "PatientPhone": "={{ $json.patient_phone }}",
+            "Channel": "={{ $json.channel }}",
+            "ErrorType": "={{ $json.error_type }}",
+            "ErrorMessage": "={{ $json.error_message }}",
+            "ExecutionId": "={{ $json.execution_id }}",
+            "Recoverable": "={{ $json.recoverable }}",
+            "RawError": "={{ $json.raw_error }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "111b3bb0-93a7-46ae-9a2d-56ff35d2f148",
+      "name": "Append to ErrorLog (Google Sheets)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        432
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $('Classify Recoverability').first().json;\n\nreturn [{\n  json: {\n    success: false,\n    recoverable: item.recoverable,\n    error: item.error_message,\n    workflow: item.workflow,\n    node: item.node,\n    correlation_id: item.correlation_id,\n    timestamp: item.timestamp\n  }\n}];"
+      },
+      "id": "c51f9e9e-55f3-402f-aaf7-f26ccf3337c5",
+      "name": "Build Normalized Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        432
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "9543540b-fb12-46f5-8a37-277ef5d4615d",
+      "name": "End (No Further Action)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        432
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize ErrorEvent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize ErrorEvent": {
+      "main": [
+        [
+          {
+            "node": "Classify Recoverability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Recoverability": {
+      "main": [
+        [
+          {
+            "node": "Append to ErrorLog (Google Sheets)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append to ErrorLog (Google Sheets)": {
+      "main": [
+        [
+          {
+            "node": "Build Normalized Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Normalized Output": {
+      "main": [
+        [
+          {
+            "node": "End (No Further Action)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "381c199f-d38f-4156-b3b5-c580e052328a",
+  "meta": {
+    "instanceId": "aba10e44cce8963ab17711ef7157202c5c8df3fafa0caf471cf4465c447c3faa"
+  },
+  "nodeGroups": [],
+  "id": "vPO96OdB0NMMW1uf",
+  "tags": []
+}

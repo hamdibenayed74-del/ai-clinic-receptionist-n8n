@@ -1,0 +1,878 @@
+{
+  "name": "SW-03 Appointment Scheduler",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "Purpose\n\nProcesses appointment requests from SW-02 AI Receptionist.\n\nResponsibilities\n\n• Load appointments\n• Load clinic rules\n• Generate scheduling decision\n• Persist confirmed appointments\n• Return SchedulerResult\n\nDependencies\n\n• SW-01B Appointment Storage\n• CFG-01 Configuration",
+        "height": 396,
+        "width": 444
+      },
+      "id": "bed4b273-b2e0-414e-a6d9-4b1da5aa4972",
+      "name": "Sticky Note - Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        16,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_SW-01b_Appointments_ID",
+          "cachedResultName": "SW-01b_Appointments"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "read",
+            "doctor": "={{ $json.doctor }}",
+            "date_from": "={{ $json.preferred_date }}",
+            "date_to": "={{ $json.preferred_date }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "aab28d35-eaff-444d-ad6b-c224cedbb0a4",
+      "name": "Execute Workflow: Get Appointments",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        288,
+        352
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_SW-01c_Rules_ID",
+          "cachedResultName": "SW-01c_Rules"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "read",
+            "doctor": "={{ $('Receive Scheduling Request').item.json.doctor }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "46755dd6-156b-407a-a5b3-38384f57e595",
+      "name": "Execute Workflow: Get Clinic Rules",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        528,
+        352
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "patient_request",
+              "type": "object",
+              "value": "={{ $('Receive Scheduling Request').item.json }}"
+            },
+            {
+              "id": "a2",
+              "name": "existing_appointments",
+              "type": "array",
+              "value": "={{ $json.appointments || [] }}"
+            },
+            {
+              "id": "a3",
+              "name": "clinic_rules",
+              "type": "object",
+              "value": "={{ $json.clinic_rules || {} }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ff8b7884-ee0b-4870-ab99-6985639df8ea",
+      "name": "Build Scheduler Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        768,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-6"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "e476b7d2-9f7c-494d-8285-0187979c79eb",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        992,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"required\": [\"status\"],\n  \"properties\": {\n    \"status\": { \"type\": \"string\", \"enum\": [\"confirmed\", \"alternative\", \"rejected\"] },\n    \"appointment\": {\n      \"type\": [\"object\", \"null\"],\n      \"properties\": {\n        \"appointment_id\": { \"type\": \"string\" },\n        \"doctor\": { \"type\": \"string\" },\n        \"date\": { \"type\": \"string\" },\n        \"time\": { \"type\": \"string\" },\n        \"duration\": { \"type\": \"integer\" },\n        \"patient_name\": { \"type\": \"string\" },\n        \"phone\": { \"type\": \"string\" },\n        \"reason\": { \"type\": \"string\" },\n        \"status\": { \"type\": \"string\", \"enum\": [\"booked\", \"rescheduled\", \"cancelled\"] }\n      }\n    },\n    \"slots\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n    \"rejection_reason\": { \"type\": [\"string\", \"null\"] },\n    \"existing_appointment_id\": { \"type\": [\"string\", \"null\"] }\n  }\n}"
+      },
+      "id": "777ee5ea-af5d-4ddb-a820-660424a509a3",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        1152,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_BASE_URL }}/webhook/storage/appointments/check-slot",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"doctor\": \"{{ $fromAI('doctor', 'Doctor name to check availability for', 'string') }}\",\n  \"date\": \"{{ $fromAI('date', 'ISO date YYYY-MM-DD', 'string') }}\",\n  \"time\": \"{{ $fromAI('time', 'Time in HH:MM 24h format', 'string') }}\",\n  \"duration\": {{ $fromAI('duration', 'Duration in minutes', 'number') }}\n}"
+      },
+      "id": "cc4f39f0-f92c-4a00-ae08-fa1f54dc671a",
+      "name": "checkSlotTool",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1312,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_BASE_URL }}/webhook/storage/appointments/list-alternatives",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"doctor\": \"{{ $fromAI('doctor', 'Doctor name to find open slots for', 'string') }}\",\n  \"date\": \"{{ $fromAI('date', 'ISO date YYYY-MM-DD to search near', 'string') }}\",\n  \"duration\": {{ $fromAI('duration', 'Duration in minutes', 'number') }},\n  \"count\": {{ $fromAI('count', 'Number of alternative slots to return, max 3', 'number') }}\n}"
+      },
+      "id": "cfb1b84b-fdea-40da-8ead-4d64d11b1cac",
+      "name": "listAlternativesTool",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1472,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=REQUEST:\n{{ JSON.stringify($json.patient_request) }}\n\nEXISTING_APPOINTMENTS:\n{{ JSON.stringify($json.existing_appointments) }}\n\nCLINIC_RULES:\n{{ JSON.stringify($json.clinic_rules) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are the scheduling engine for {{ $env.CLINIC_NAME }}. You never talk to the patient directly — you receive structured requests and return structured scheduling decisions.\n\nYou have two tools:\n1. checkSlotTool(doctor, date, time, duration) -> availability boolean plus conflicting appointment info if any.\n2. listAlternativesTool(doctor, date, duration, count) -> up to `count` valid open slots near the requested date, respecting working hours, lunch breaks, holidays, blocked times, and vacations.\n\nRULES:\n- A slot is only valid if it fits entirely within the doctor's working hours, does not overlap lunch break, blocked time, holiday, or an existing appointment, and leaves the standard buffer ({{ $env.APPOINTMENT_BUFFER_MINUTES }} minutes) between appointments.\n- intent=\"new_appointment\": try the requested date/time with checkSlotTool. If free, return status=\"confirmed\" with the appointment object. If not free, call listAlternativesTool and return status=\"alternative\" with up to 3 slots.\n- intent=\"reschedule_appointment\": treat like new_appointment but also mark the prior appointment for cancellation in the returned object (include existing_appointment_id).\n- intent=\"cancel_appointment\": return status=\"confirmed\" with appointment.status=\"cancelled\" and the appointment_id.\n- intent=\"emergency\": always try to find the soonest possible slot (today, using the emergency slot allowance of {{ $env.EMERGENCY_SLOT_ALLOWANCE_MINUTES }} minutes) and return status=\"confirmed\" or, if truly nothing is available, status=\"alternative\" with the earliest 3 options, clearly prioritized.\n- If required fields are missing and cannot be inferred, return status=\"rejected\" with a clear rejection_reason.\n- Always output valid JSON matching the schema. No text outside JSON.",
+          "maxIterations": 3
+        }
+      },
+      "id": "8f544988-8d69-4df1-80c7-ec8d32f0e18d",
+      "name": "Scheduler AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1040,
+        352
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Minimal guard: the Structured Output Parser should already hand back an object,\n// but we defensively re-parse and check the required enum before trusting it.\nconst raw = $input.item.json;\nlet parsed = raw.output !== undefined ? raw.output : raw;\n\ntry {\n  if (typeof parsed === 'string') {\n    parsed = JSON.parse(parsed);\n  }\n} catch (e) {\n  return { json: { valid: false, error: 'JSON parse failure: ' + e.message } };\n}\n\nconst validStatuses = ['confirmed', 'alternative', 'rejected'];\nconst isValid = !!parsed && typeof parsed === 'object' && validStatuses.includes(parsed.status);\n\nreturn {\n  json: {\n    valid: isValid,\n    error: isValid ? null : 'Missing or invalid \"status\" field in Scheduler AI output',\n    scheduler_result: isValid ? parsed : null\n  }\n};"
+      },
+      "id": "99aa516b-ceed-4742-b266-b62af5dc97a5",
+      "name": "Parse & Validate JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3949a431-0d02-4f97-a1fc-72e4a19cf4f1",
+      "name": "IF: Valid Schema",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1504,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "s1",
+                    "leftValue": "={{ $json.scheduler_result.status }}",
+                    "rightValue": "confirmed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "s2",
+                    "leftValue": "={{ $json.scheduler_result.status }}",
+                    "rightValue": "alternative",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "s3",
+                    "leftValue": "={{ $json.scheduler_result.status }}",
+                    "rightValue": "rejected",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "8078d0c7-6eb3-44ac-8c44-3ce92fce75ed",
+      "name": "Switch: Status",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1728,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "w1",
+              "name": "write_action",
+              "type": "string",
+              "value": "={{ $('Receive Scheduling Request').item.json.intent === 'cancel_appointment' ? 'cancel' : ($('Receive Scheduling Request').item.json.intent === 'reschedule_appointment' ? 'update' : 'write') }}"
+            },
+            {
+              "id": "w2",
+              "name": "appointment",
+              "type": "object",
+              "value": "={{ $json.scheduler_result.appointment }}"
+            },
+            {
+              "id": "w3",
+              "name": "existing_appointment_id",
+              "type": "string",
+              "value": "={{ $json.scheduler_result.existing_appointment_id || $('Receive Scheduling Request').item.json.existing_appointment_id }}"
+            },
+            {
+              "id": "w4",
+              "name": "slots",
+              "type": "array",
+              "value": "={{ $json.scheduler_result.slots || [] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ee98fef1-0e84-4f97-afba-578b0e8aee1d",
+      "name": "Prepare Write Appointment",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1952,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_SW-01b_Appointments_ID",
+          "cachedResultName": "SW-01b_Appointments"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "={{ $json.write_action }}",
+            "appointment": "={{ $json.appointment }}",
+            "existing_appointment_id": "={{ $json.existing_appointment_id }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "71df854d-eaef-417d-b1ad-1920daaaa802",
+      "name": "Execute Workflow: Write Appointment",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2160,
+        208
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1",
+              "name": "status",
+              "type": "string",
+              "value": "rejected"
+            },
+            {
+              "id": "e2",
+              "name": "appointment",
+              "type": "object",
+              "value": "={{ null }}"
+            },
+            {
+              "id": "e3",
+              "name": "slots",
+              "type": "array",
+              "value": "=[]"
+            },
+            {
+              "id": "e4",
+              "name": "rejection_reason",
+              "type": "string",
+              "value": "={{ $json.error?.message || $json.error || 'Scheduler encountered an internal error. A team member will follow up shortly.' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "699af46b-cb6f-4d90-a531-f10cc02eca74",
+      "name": "Error Fallback",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1952,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"intent\": \"new_appointment\",\n  \"patient_name\": \"string|null\",\n  \"phone\": \"string\",\n  \"language\": \"fr|ar|en\",\n  \"doctor\": \"string|null\",\n  \"preferred_date\": \"YYYY-MM-DD|null\",\n  \"preferred_time\": \"HH:MM|null\",\n  \"duration\": 30,\n  \"reason\": \"string|null\",\n  \"existing_appointment_id\": \"string|null\"\n}"
+      },
+      "id": "661dbce6-7c1a-4ac0-9888-6d867d010f3c",
+      "name": "Receive Scheduling Request",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        32,
+        352
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "b1c53b41-8e7e-4e7c-8120-593cefb1e6a3",
+      "name": "Return Scheduler Result",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2608,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "o1",
+              "name": "status",
+              "type": "string",
+              "value": "confirmed"
+            },
+            {
+              "id": "o2",
+              "name": "appointment",
+              "type": "object",
+              "value": "={{ $json.appointment ?? $json }}"
+            },
+            {
+              "id": "o3",
+              "name": "slots",
+              "type": "array",
+              "value": "=[]"
+            },
+            {
+              "id": "o4",
+              "name": "rejection_reason",
+              "type": "string",
+              "value": "={{ null }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d32a77e2-0977-4df4-9fde-d14989239449",
+      "name": "Build Confirmed Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2384,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "o1",
+              "name": "status",
+              "type": "string",
+              "value": "alternative"
+            },
+            {
+              "id": "o2",
+              "name": "appointment",
+              "type": "object",
+              "value": "={{ null }}"
+            },
+            {
+              "id": "o3",
+              "name": "slots",
+              "type": "array",
+              "value": "={{ $json.scheduler_result.slots || [] }}"
+            },
+            {
+              "id": "o4",
+              "name": "rejection_reason",
+              "type": "string",
+              "value": "={{ null }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fa572de2-77c9-488f-9867-4854e053dacf",
+      "name": "Build Alternative Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1952,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "o1",
+              "name": "status",
+              "type": "string",
+              "value": "rejected"
+            },
+            {
+              "id": "o2",
+              "name": "appointment",
+              "type": "object",
+              "value": "={{ null }}"
+            },
+            {
+              "id": "o3",
+              "name": "slots",
+              "type": "array",
+              "value": "=[]"
+            },
+            {
+              "id": "o4",
+              "name": "rejection_reason",
+              "type": "string",
+              "value": "={{ $json.scheduler_result.rejection_reason || 'Request could not be scheduled.' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0d7bd378-4eb6-437b-bb20-5d1fcaf77e04",
+      "name": "Build Rejected Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1952,
+        528
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Execute Workflow: Get Appointments": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow: Get Clinic Rules",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow: Get Clinic Rules": {
+      "main": [
+        [
+          {
+            "node": "Build Scheduler Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Scheduler Context": {
+      "main": [
+        [
+          {
+            "node": "Scheduler AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Scheduler AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Scheduler AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "checkSlotTool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Scheduler AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "listAlternativesTool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Scheduler AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scheduler AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse & Validate JSON",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Validate JSON": {
+      "main": [
+        [
+          {
+            "node": "IF: Valid Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Valid Schema": {
+      "main": [
+        [
+          {
+            "node": "Switch: Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Status": {
+      "main": [
+        [
+          {
+            "node": "Prepare Write Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Alternative Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Rejected Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Write Appointment": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow: Write Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow: Write Appointment": {
+      "main": [
+        [
+          {
+            "node": "Build Confirmed Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Fallback": {
+      "main": [
+        [
+          {
+            "node": "Return Scheduler Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive Scheduling Request": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow: Get Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Confirmed Result": {
+      "main": [
+        [
+          {
+            "node": "Return Scheduler Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Alternative Result": {
+      "main": [
+        [
+          {
+            "node": "Return Scheduler Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Rejected Result": {
+      "main": [
+        [
+          {
+            "node": "Return Scheduler Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "c6c56488-e0e2-4df1-a9d2-dfef8fe8f327",
+  "meta": {
+    "instanceId": "aba10e44cce8963ab17711ef7157202c5c8df3fafa0caf471cf4465c447c3faa"
+  },
+  "nodeGroups": [],
+  "id": "6Q7WES0H1Fl2ozns",
+  "tags": []
+}

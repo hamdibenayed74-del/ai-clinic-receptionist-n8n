@@ -1,0 +1,707 @@
+{
+  "name": "SW-01 Conversation Memory",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "SW-01 Conversation Memory\n\nPurpose\n\nProvides a single interface for reading and writing conversation history.\n\nResponsibilities\n\n• Load conversation memory\n• Update conversation memory\n• Return memory state\n\nConsumers\n\n• MW-00 Router\n• SW-02 AI Receptionist",
+        "height": 372,
+        "width": 680
+      },
+      "id": "a41ff716-161d-4a9f-ad7e-78d5d854e82b",
+      "name": "Module Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "patient_phone"
+            },
+            {
+              "name": "channel"
+            },
+            {
+              "name": "action"
+            },
+            {
+              "name": "payload",
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "id": "2a560ea8-c970-42b5-aa5c-694bdb654c34",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        432
+      ],
+      "notes": "Expected input: { patient_phone, channel, action: 'get'|'set', payload }"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r1",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "get",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r2",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "set",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "6ed6e272-b816-41f9-b54e-f99b220b29ce",
+      "name": "Switch: get/set",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        240,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1",
+              "name": "storage_error",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "e2",
+              "name": "error_message",
+              "type": "string",
+              "value": "=Unknown Memory action: {{ $json.action }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "051befe4-c53f-4a29-ab57-973f9ff81045",
+      "name": "Unknown Action - Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        880
+      ],
+      "notes": "Defensive branch: action was neither 'get' nor 'set'."
+    },
+    {
+      "parameters": {
+        "operation": "lookup",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SHEETS_SPREADSHEET_ID }}"
+        }
+      },
+      "id": "6f88f816-91e6-4d5c-b34e-880fb052e3ec",
+      "name": "Google Sheets - Read Memory",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        288
+      ],
+      "onError": "continueErrorOutput",
+      "notes": "Sheet: ConversationState. Looks up the existing row by phone number."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "993780fa-426c-4ffe-9b2f-94c75ea1e803",
+      "name": "IF: Record Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "p1",
+              "name": "phone",
+              "type": "string",
+              "value": "={{ $json.phone }}"
+            },
+            {
+              "id": "p2",
+              "name": "channel",
+              "type": "string",
+              "value": "={{ $json.channel }}"
+            },
+            {
+              "id": "p3",
+              "name": "patient_name",
+              "type": "string",
+              "value": "={{ $json.patient_name || null }}"
+            },
+            {
+              "id": "p4",
+              "name": "language",
+              "type": "string",
+              "value": "={{ $json.language || 'fr' }}"
+            },
+            {
+              "id": "p5",
+              "name": "last_intent",
+              "type": "string",
+              "value": "={{ $json.last_intent || null }}"
+            },
+            {
+              "id": "p6",
+              "name": "collected_fields",
+              "type": "object",
+              "value": "={{ $json.collected_fields ? JSON.parse($json.collected_fields) : { preferred_date: null, preferred_time: null, reason: null, doctor: null } }}"
+            },
+            {
+              "id": "p7",
+              "name": "conversation_history",
+              "type": "array",
+              "value": "={{ $json.conversation_history ? JSON.parse($json.conversation_history) : [] }}"
+            },
+            {
+              "id": "p8",
+              "name": "active_appointment_id",
+              "type": "string",
+              "value": "={{ $json.active_appointment_id || null }}"
+            },
+            {
+              "id": "p9",
+              "name": "last_message_id",
+              "type": "string",
+              "value": "={{ $json.last_message_id || null }}"
+            },
+            {
+              "id": "p10",
+              "name": "updated_at",
+              "type": "string",
+              "value": "={{ $json.updated_at || null }}"
+            },
+            {
+              "id": "p11",
+              "name": "storage_error",
+              "type": "boolean",
+              "value": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0ca88ac3-002f-45ee-b0d3-7fcfcdb5ebcb",
+      "name": "Parse Existing Memory",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        160
+      ],
+      "notes": "conversation_history is stored as a JSON string in the sheet cell; parse it back into an array for the caller."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1",
+              "name": "phone",
+              "type": "string",
+              "value": "={{ $('Switch: get/set').item.json.patient_phone }}"
+            },
+            {
+              "id": "d2",
+              "name": "channel",
+              "type": "string",
+              "value": "={{ $('Switch: get/set').item.json.channel }}"
+            },
+            {
+              "id": "d3",
+              "name": "patient_name",
+              "type": "string",
+              "value": "=null"
+            },
+            {
+              "id": "d4",
+              "name": "language",
+              "type": "string",
+              "value": "fr"
+            },
+            {
+              "id": "d5",
+              "name": "last_intent",
+              "type": "string",
+              "value": "=null"
+            },
+            {
+              "id": "d6",
+              "name": "collected_fields",
+              "type": "object",
+              "value": "={{ { preferred_date: null, preferred_time: null, reason: null, doctor: null } }}"
+            },
+            {
+              "id": "d7",
+              "name": "conversation_history",
+              "type": "array",
+              "value": "=[]"
+            },
+            {
+              "id": "d8",
+              "name": "active_appointment_id",
+              "type": "string",
+              "value": "=null"
+            },
+            {
+              "id": "d9",
+              "name": "last_message_id",
+              "type": "string",
+              "value": "=null"
+            },
+            {
+              "id": "d10",
+              "name": "updated_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "id": "d11",
+              "name": "storage_error",
+              "type": "boolean",
+              "value": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a2fe0633-9d2f-47ff-bcb6-dfceb0f828cb",
+      "name": "Build Default Memory",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        400
+      ],
+      "notes": "No existing row for this phone number yet - return a fresh, empty ConversationState scaffold."
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst payload = item.payload || {};\nconst history = Array.isArray(payload.conversation_history) ? payload.conversation_history : [];\nconst trimmed = history.slice(-15);\nreturn [{\n  json: {\n    patient_phone: item.patient_phone,\n    channel: item.channel,\n    payload: { ...payload, conversation_history: trimmed }\n  }\n}];"
+      },
+      "id": "610606a2-0335-4e16-8e66-ed7b99336c80",
+      "name": "Trim Conversation History",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        560
+      ],
+      "notes": "Caps conversation_history to the last 15 turns before persisting, to control token cost on future agent calls (genuine data-shaping logic, not business logic - allowed per house rules)."
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SHEETS_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ConversationState"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "phone"
+          ],
+          "value": {
+            "phone": "={{ $json.patient_phone }}",
+            "channel": "={{ $json.channel }}",
+            "patient_name": "={{ $json.payload.patient_name || null }}",
+            "language": "={{ $json.payload.language || 'fr' }}",
+            "last_intent": "={{ $json.payload.last_intent || null }}",
+            "collected_fields": "={{ JSON.stringify($json.payload.collected_fields || {}) }}",
+            "conversation_history": "={{ JSON.stringify($json.payload.conversation_history || []) }}",
+            "active_appointment_id": "={{ $json.payload.active_appointment_id || null }}",
+            "last_message_id": "={{ $json.payload.last_message_id || null }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "dde8899d-1f12-45ec-9e74-fbceab830800",
+      "name": "Google Sheets - Upsert Memory",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        560
+      ],
+      "onError": "continueErrorOutput",
+      "notes": "Sheet: ConversationState. Appends a new row or updates the existing one, matched on phone. conversation_history/collected_fields are stringified for storage."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "phone",
+              "type": "string",
+              "value": "={{ $json.phone }}"
+            },
+            {
+              "id": "s2",
+              "name": "channel",
+              "type": "string",
+              "value": "={{ $json.channel }}"
+            },
+            {
+              "id": "s3",
+              "name": "patient_name",
+              "type": "string",
+              "value": "={{ $json.patient_name }}"
+            },
+            {
+              "id": "s4",
+              "name": "language",
+              "type": "string",
+              "value": "={{ $json.language }}"
+            },
+            {
+              "id": "s5",
+              "name": "last_intent",
+              "type": "string",
+              "value": "={{ $json.last_intent }}"
+            },
+            {
+              "id": "s6",
+              "name": "collected_fields",
+              "type": "object",
+              "value": "={{ JSON.parse($json.collected_fields) }}"
+            },
+            {
+              "id": "s7",
+              "name": "conversation_history",
+              "type": "array",
+              "value": "={{ JSON.parse($json.conversation_history) }}"
+            },
+            {
+              "id": "s8",
+              "name": "active_appointment_id",
+              "type": "string",
+              "value": "={{ $json.active_appointment_id }}"
+            },
+            {
+              "id": "s9",
+              "name": "last_message_id",
+              "type": "string",
+              "value": "={{ $json.last_message_id }}"
+            },
+            {
+              "id": "s10",
+              "name": "updated_at",
+              "type": "string",
+              "value": "={{ $json.updated_at }}"
+            },
+            {
+              "id": "s11",
+              "name": "storage_error",
+              "type": "boolean",
+              "value": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "519d2c45-f17a-43d2-92b9-d2320eb4b819",
+      "name": "Format Output - Saved State",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        560
+      ],
+      "notes": "Echoes back the just-saved ConversationState in canonical shape."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "phone",
+              "type": "string",
+              "value": "={{ $json.patient_phone || $json.phone || '' }}"
+            },
+            {
+              "id": "f2",
+              "name": "channel",
+              "type": "string",
+              "value": "={{ $json.channel || '' }}"
+            },
+            {
+              "id": "f3",
+              "name": "patient_name",
+              "type": "string",
+              "value": "=null"
+            },
+            {
+              "id": "f4",
+              "name": "language",
+              "type": "string",
+              "value": "fr"
+            },
+            {
+              "id": "f5",
+              "name": "last_intent",
+              "type": "string",
+              "value": "=null"
+            },
+            {
+              "id": "f6",
+              "name": "collected_fields",
+              "type": "object",
+              "value": "={{ { preferred_date: null, preferred_time: null, reason: null, doctor: null } }}"
+            },
+            {
+              "id": "f7",
+              "name": "conversation_history",
+              "type": "array",
+              "value": "=[]"
+            },
+            {
+              "id": "f8",
+              "name": "active_appointment_id",
+              "type": "string",
+              "value": "=null"
+            },
+            {
+              "id": "f9",
+              "name": "last_message_id",
+              "type": "string",
+              "value": "=null"
+            },
+            {
+              "id": "f10",
+              "name": "updated_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "id": "f11",
+              "name": "storage_error",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "44420ec2-39a3-4e6f-8cba-303069d52838",
+      "name": "Sheets Error - Build Fallback State",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        800
+      ],
+      "notes": "Fires when either Google Sheets node errors (service down, quota, auth). Returns a safe default ConversationState with storage_error=true so callers degrade gracefully instead of crashing."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Switch: get/set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: get/set": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Read Memory",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Trim Conversation History",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unknown Action - Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Read Memory": {
+      "main": [
+        [
+          {
+            "node": "IF: Record Found",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sheets Error - Build Fallback State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Record Found": {
+      "main": [
+        [
+          {
+            "node": "Parse Existing Memory",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Default Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trim Conversation History": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Upsert Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Upsert Memory": {
+      "main": [
+        [
+          {
+            "node": "Format Output - Saved State",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sheets Error - Build Fallback State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "1891759b-9097-4df3-8692-1526960724da",
+  "meta": {
+    "instanceId": "aba10e44cce8963ab17711ef7157202c5c8df3fafa0caf471cf4465c447c3faa"
+  },
+  "nodeGroups": [],
+  "id": "HzgUMt6e0jtKfnxm",
+  "tags": []
+}

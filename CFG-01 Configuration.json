@@ -1,0 +1,1436 @@
+{
+  "name": "CFG-01 Configuration",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "CFG-01 Configuration\n\nPurpose\n\nCentral source for all clinic configuration.\n\nResponsibilities\n\n• Clinic information\n• Doctors\n• Schedules\n• Business hours\n• Appointment types\n• Languages\n• Timezone\n• Holidays\n• Reminder settings\n• AI configuration\n\nConsumers\n\n• MW-00 Router\n• SW-02 AI Receptionist\n• SW-03 Appointment Scheduler",
+        "height": 544,
+        "width": 368
+      },
+      "id": "408648b1-1a4f-4d97-ad9c-669de6e85cf1",
+      "name": "Sticky Note - Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const allowedActions = [\n  'getClinicInfo', 'getDoctors', 'getDoctorSchedule', 'getBusinessHours',\n  'getAppointmentTypes', 'getSupportedLanguages', 'getTimezone',\n  'getHolidayCalendar', 'getReminderSettings', 'getAIConfiguration'\n];\n\nconst action = $json.action;\nconst clinic_id = $json.clinic_id || 'default';\nconst doctor_id = $json.doctor_id || null;\n\nif (!action || !allowedActions.includes(action)) {\n  return { json: { valid: false, error: `Unsupported or missing action: \"${action}\"`, action: action || null, clinic_id, doctor_id } };\n}\n\nif (action === 'getDoctorSchedule' && !doctor_id) {\n  return { json: { valid: false, error: 'doctor_id is required for getDoctorSchedule', action, clinic_id, doctor_id } };\n}\n\nreturn { json: { valid: true, error: null, action, clinic_id, doctor_id } };"
+      },
+      "id": "67d62b9b-befe-4459-8eb9-b516c5cd021b",
+      "name": "Validate Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "v1",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c2997a97-b2a1-4a0e-811e-9eb1a4df7660",
+      "name": "IF: Valid Request",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        704,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r1",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "getClinicInfo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r2",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "getDoctors",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r3",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "getDoctorSchedule",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r4",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "getBusinessHours",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r5",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "getAppointmentTypes",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r6",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "getSupportedLanguages",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r7",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "getTimezone",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r8",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "getHolidayCalendar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r9",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "getReminderSettings",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r10",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "getAIConfiguration",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "23f10326-b1f3-4a7c-8078-1e84b3ffeec4",
+      "name": "Switch: Route Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        944,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_CONFIG_SPREADSHEET_ID",
+          "cachedResultName": "Medical Receptionist - Configuration"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "ClinicInfo",
+          "cachedResultName": "ClinicInfo"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "clinic_id",
+              "lookupValue": "={{ $('Validate Request').first().json.clinic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6e413d33-23f9-4e2d-b9fb-5c6aa7e86c0d",
+      "name": "Get Clinic Info",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1248,
+        48
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nif (rows.length === 0) { return [{ json: { data: null } }]; }\nconst r = rows[0];\nreturn [{ json: { data: {\n  clinic_id: r.clinic_id,\n  clinic_name: r.clinic_name,\n  address: r.address,\n  phone: r.phone,\n  whatsapp_number: r.whatsapp_number,\n  email: r.email,\n  timezone: r.timezone\n} } }];"
+      },
+      "id": "753cb20f-4a0a-45fb-9a3c-410a965c3cdf",
+      "name": "Normalize Clinic Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_CONFIG_SPREADSHEET_ID",
+          "cachedResultName": "Medical Receptionist - Configuration"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Doctors",
+          "cachedResultName": "Doctors"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "clinic_id",
+              "lookupValue": "={{ $('Validate Request').first().json.clinic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f33d0992-5caf-4a5d-9d8d-bda28ff02be5",
+      "name": "Get Doctors",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1248,
+        160
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nif (rows.length === 0) { return [{ json: { data: [] } }]; }\nconst data = rows.map(r => ({\n  doctor_id: r.doctor_id,\n  doctor_name: r.doctor_name,\n  specialty: r.specialty,\n  consultation_duration: r.consultation_duration,\n  working_days: r.working_days,\n  start_time: r.start_time,\n  end_time: r.end_time,\n  lunch_break: r.lunch_break\n}));\nreturn [{ json: { data } }];"
+      },
+      "id": "82dca86b-e345-4713-b4ce-438db061c6bb",
+      "name": "Normalize Doctors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_CONFIG_SPREADSHEET_ID",
+          "cachedResultName": "Medical Receptionist - Configuration"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Doctors",
+          "cachedResultName": "Doctors"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "clinic_id",
+              "lookupValue": "={{ $('Validate Request').first().json.clinic_id }}"
+            },
+            {
+              "lookupColumn": "doctor_id",
+              "lookupValue": "={{ $('Validate Request').first().json.doctor_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b97fadaa-06a7-49f7-bdf4-f813524dfd3d",
+      "name": "Get Doctor Schedule",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1248,
+        288
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nif (rows.length === 0) { return [{ json: { data: null } }]; }\nconst r = rows[0];\nreturn [{ json: { data: {\n  doctor_id: r.doctor_id,\n  doctor_name: r.doctor_name,\n  specialty: r.specialty,\n  consultation_duration: r.consultation_duration,\n  working_days: r.working_days,\n  start_time: r.start_time,\n  end_time: r.end_time,\n  lunch_break: r.lunch_break\n} } }];"
+      },
+      "id": "9ff748e7-a7d6-4731-bb65-8a793ef2705c",
+      "name": "Normalize Doctor Schedule",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_CONFIG_SPREADSHEET_ID",
+          "cachedResultName": "Medical Receptionist - Configuration"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "BusinessHours",
+          "cachedResultName": "BusinessHours"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "clinic_id",
+              "lookupValue": "={{ $('Validate Request').first().json.clinic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "55aeb908-4114-4d38-b93f-53d2087fbafd",
+      "name": "Get Business Hours",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1248,
+        400
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nif (rows.length === 0) { return [{ json: { data: [] } }]; }\nconst data = rows.map(r => ({ weekday: r.weekday, open_time: r.open_time, close_time: r.close_time }));\nreturn [{ json: { data } }];"
+      },
+      "id": "3ac96f64-d609-4f30-8b58-2f82b541f99a",
+      "name": "Normalize Business Hours",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_CONFIG_SPREADSHEET_ID",
+          "cachedResultName": "Medical Receptionist - Configuration"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "AppointmentTypes",
+          "cachedResultName": "AppointmentTypes"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "clinic_id",
+              "lookupValue": "={{ $('Validate Request').first().json.clinic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7240fece-322f-4727-ac2a-32062dd3dc5c",
+      "name": "Get Appointment Types",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1248,
+        528
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nif (rows.length === 0) { return [{ json: { data: [] } }]; }\nconst data = rows.map(r => ({ type_key: r.type_key, label: r.label, default_duration_min: r.default_duration_min }));\nreturn [{ json: { data } }];"
+      },
+      "id": "3c093bb5-94a5-450d-8312-50a66f2bf9dc",
+      "name": "Normalize Appointment Types",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_CONFIG_SPREADSHEET_ID",
+          "cachedResultName": "Medical Receptionist - Configuration"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Languages",
+          "cachedResultName": "Languages"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "clinic_id",
+              "lookupValue": "={{ $('Validate Request').first().json.clinic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "abf1ec10-3170-4e42-b5e2-ea2565805fb0",
+      "name": "Get Supported Languages",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1248,
+        640
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nif (rows.length === 0) { return [{ json: { data: [] } }]; }\nconst data = rows\n  .filter(r => String(r.enabled).toLowerCase() !== 'false')\n  .map(r => ({ language_code: r.language_code, language_name: r.language_name }));\nreturn [{ json: { data } }];"
+      },
+      "id": "eca7aa6c-021f-4088-988f-05333d02cfdf",
+      "name": "Normalize Languages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_CONFIG_SPREADSHEET_ID",
+          "cachedResultName": "Medical Receptionist - Configuration"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "ClinicInfo",
+          "cachedResultName": "ClinicInfo"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "clinic_id",
+              "lookupValue": "={{ $('Validate Request').first().json.clinic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "610167ae-70fd-43bd-a597-06ac9607951a",
+      "name": "Get Timezone",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1248,
+        768
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nif (rows.length === 0) { return [{ json: { data: null } }]; }\nreturn [{ json: { data: { timezone: rows[0].timezone } } }];"
+      },
+      "id": "f08d0701-b715-4b1d-b26f-b5d0e8e30b95",
+      "name": "Normalize Timezone",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_CONFIG_SPREADSHEET_ID",
+          "cachedResultName": "Medical Receptionist - Configuration"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "HolidayCalendar",
+          "cachedResultName": "HolidayCalendar"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "clinic_id",
+              "lookupValue": "={{ $('Validate Request').first().json.clinic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e611201f-9e5f-47b1-8364-762054cb8407",
+      "name": "Get Holiday Calendar",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1248,
+        880
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nif (rows.length === 0) { return [{ json: { data: [] } }]; }\nconst data = rows.map(r => ({ date: r.date, name: r.name }));\nreturn [{ json: { data } }];"
+      },
+      "id": "587fcfa1-c8d1-4fbe-a1e3-4e065faeee03",
+      "name": "Normalize Holiday Calendar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_CONFIG_SPREADSHEET_ID",
+          "cachedResultName": "Medical Receptionist - Configuration"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "ReminderSettings",
+          "cachedResultName": "ReminderSettings"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "clinic_id",
+              "lookupValue": "={{ $('Validate Request').first().json.clinic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "39e2ce16-c102-4cd8-9118-f712e7ffd2f0",
+      "name": "Get Reminder Settings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1248,
+        1008
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nif (rows.length === 0) { return [{ json: { data: null } }]; }\nconst r = rows[0];\nreturn [{ json: { data: {\n  reminder_24h: r.reminder_24h,\n  reminder_2h: r.reminder_2h,\n  sms_enabled: r.sms_enabled,\n  whatsapp_enabled: r.whatsapp_enabled\n} } }];"
+      },
+      "id": "1770d16a-470c-45a9-afa8-d3a12e138b27",
+      "name": "Normalize Reminder Settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        1008
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_CONFIG_SPREADSHEET_ID",
+          "cachedResultName": "Medical Receptionist - Configuration"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "AIConfiguration",
+          "cachedResultName": "AIConfiguration"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "clinic_id",
+              "lookupValue": "={{ $('Validate Request').first().json.clinic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1ca68bda-b06d-492f-9620-4e62174e02f9",
+      "name": "Get AI Configuration",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1248,
+        1120
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nif (rows.length === 0) { return [{ json: { data: null } }]; }\nconst r = rows[0];\nreturn [{ json: { data: {\n  ai_provider: r.ai_provider,\n  ai_model: r.ai_model,\n  temperature: Number(r.temperature),\n  max_tokens: Number(r.max_tokens)\n} } }];"
+      },
+      "id": "5f118c19-7b0a-45e8-9083-59133eb2dbab",
+      "name": "Normalize AI Configuration",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        1120
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "success",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "s2",
+              "name": "data",
+              "type": "object",
+              "value": "={{ $json.data }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "548d7872-1a23-4468-8a44-62490d6bf0d8",
+      "name": "Build Success Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1712,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1",
+              "name": "success",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "e2",
+              "name": "data",
+              "type": "object",
+              "value": "={{ { error: $json.error || 'Invalid configuration request.' } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "43f84143-56b7-488d-8cba-f5e6bf706fbd",
+      "name": "Build Error Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        944,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "t1",
+              "name": "success",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "t2",
+              "name": "data",
+              "type": "object",
+              "value": "={{ { error: 'Configuration storage temporarily unavailable. Please try again shortly.' } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "70be576f-0515-4af6-84be-31bb651a46f4",
+      "name": "Build Storage Error Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1472,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_CONFIG_SPREADSHEET_ID",
+          "cachedResultName": "Medical Receptionist - Configuration"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "ConfigAccessLog",
+          "cachedResultName": "ConfigAccessLog"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toISO() }}",
+            "action": "={{ $('Validate Request').first().json.action }}",
+            "clinic_id": "={{ $('Validate Request').first().json.clinic_id }}",
+            "doctor_id": "={{ $('Validate Request').first().json.doctor_id }}",
+            "success": "={{ $json.success }}",
+            "error": "={{ ($json.data && $json.data.error) ? $json.data.error : '' }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "a834977a-7c60-47a7-bce9-8f839e3a5c45",
+      "name": "Log Config Access",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1952,
+        960
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"action\": \"getClinicInfo\",\n  \"doctor_id\": \"\",\n  \"clinic_id\": \"\"\n}"
+      },
+      "id": "c06c1033-736e-4998-b8c6-2a94eaa6e550",
+      "name": "Return Configuration",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        640
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a157c6dd-cc8f-4a7a-9ba3-2db413644b6b",
+      "name": "Receive Configuration Request ",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2192,
+        640
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Validate Request": {
+      "main": [
+        [
+          {
+            "node": "IF: Valid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Valid Request": {
+      "main": [
+        [
+          {
+            "node": "Switch: Route Action",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Route Action": {
+      "main": [
+        [
+          {
+            "node": "Get Clinic Info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Doctors",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Doctor Schedule",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Business Hours",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Appointment Types",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Supported Languages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Timezone",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Holiday Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Reminder Settings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get AI Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Clinic Info": {
+      "main": [
+        [
+          {
+            "node": "Normalize Clinic Info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Storage Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Clinic Info": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Doctors": {
+      "main": [
+        [
+          {
+            "node": "Normalize Doctors",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Storage Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Doctors": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Doctor Schedule": {
+      "main": [
+        [
+          {
+            "node": "Normalize Doctor Schedule",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Storage Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Doctor Schedule": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Business Hours": {
+      "main": [
+        [
+          {
+            "node": "Normalize Business Hours",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Storage Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Business Hours": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Appointment Types": {
+      "main": [
+        [
+          {
+            "node": "Normalize Appointment Types",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Storage Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Appointment Types": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Supported Languages": {
+      "main": [
+        [
+          {
+            "node": "Normalize Languages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Storage Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Languages": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Timezone": {
+      "main": [
+        [
+          {
+            "node": "Normalize Timezone",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Storage Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Timezone": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Holiday Calendar": {
+      "main": [
+        [
+          {
+            "node": "Normalize Holiday Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Storage Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Holiday Calendar": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Reminder Settings": {
+      "main": [
+        [
+          {
+            "node": "Normalize Reminder Settings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Storage Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Reminder Settings": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get AI Configuration": {
+      "main": [
+        [
+          {
+            "node": "Normalize AI Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Storage Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize AI Configuration": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Success Response": {
+      "main": [
+        [
+          {
+            "node": "Log Config Access",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Receive Configuration Request ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Error Response": {
+      "main": [
+        [
+          {
+            "node": "Log Config Access",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Receive Configuration Request ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Storage Error Response": {
+      "main": [
+        [
+          {
+            "node": "Log Config Access",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Receive Configuration Request ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Configuration": {
+      "main": [
+        [
+          {
+            "node": "Validate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "efaf2d6e-ed1c-4fd2-8736-0668d542786b",
+  "meta": {
+    "instanceId": "aba10e44cce8963ab17711ef7157202c5c8df3fafa0caf471cf4465c447c3faa"
+  },
+  "nodeGroups": [],
+  "id": "sAUaxSTyafIOp8V0",
+  "tags": []
+}

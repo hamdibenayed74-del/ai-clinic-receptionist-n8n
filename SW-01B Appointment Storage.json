@@ -1,0 +1,963 @@
+{
+  "name": "SW-01B Appointment Storage",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "122561ef-9cef-4582-8940-8d469fa95664",
+      "name": "Input - Appointment Request",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -464,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "content": "SW-01B Appointment Storage\n\nPurpose\n\nProvides a storage abstraction for appointment data.\n\nResponsibilities\n\n• Read appointments\n• Create appointments\n• Update appointments\n• Cancel appointments\n\nConsumers\n\n• SW-03 Appointment Scheduler\n\nStorage backend\n\nGoogle Sheets (current)\nCan later be replaced by:\n• Airtable\n• PostgreSQL\n• Google Calendar",
+        "height": 564,
+        "width": 428
+      },
+      "id": "5ed8ef4a-8f68-4580-a80e-b51bb40b0067",
+      "name": "Sticky Note - Contract",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -672,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.action}}",
+                    "rightValue": "read",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "read"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.action}}",
+                    "rightValue": "write",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "write"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.action}}",
+                    "rightValue": "update",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "update"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.action}}",
+                    "rightValue": "cancel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "cancel"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "invalid"
+        }
+      },
+      "id": "680fe7e5-51b6-427b-8627-a421247b7b1d",
+      "name": "Switch - Action Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -240,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{$env.GOOGLE_SHEETS_SPREADSHEET_ID}}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "doctor",
+              "lookupValue": "={{$json.payload.doctor}}"
+            },
+            {
+              "lookupColumn": "date",
+              "lookupValue": "={{$json.payload.date}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f8787ab8-8fb2-4af8-becb-37ebe7f69d12",
+      "name": "Google Sheets - Read Appointments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        0,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "status",
+              "type": "string",
+              "value": "read_ok"
+            },
+            {
+              "id": "r2",
+              "name": "appointments",
+              "type": "array",
+              "value": "={{$input.all().map(i => i.json)}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c1a9b56c-d878-450c-8829-75d3bc59997f",
+      "name": "Format Output - Read",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{$env.GOOGLE_SHEETS_SPREADSHEET_ID}}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "doctor",
+              "lookupValue": "={{$json.payload.doctor}}"
+            },
+            {
+              "lookupColumn": "date",
+              "lookupValue": "={{$json.payload.date}}"
+            },
+            {
+              "lookupColumn": "time",
+              "lookupValue": "={{$json.payload.time}}"
+            },
+            {
+              "lookupColumn": "status",
+              "lookupValue": "booked"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "28e59129-73ab-4e50-9e45-d6b19c0ff367",
+      "name": "Google Sheets - Check Slot Availability",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        0,
+        256
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{$json.appointment_id}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "827262f0-2bfe-4018-8dcd-9ece6b088550",
+      "name": "IF - Slot Available",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "action": "generate",
+        "dataPropertyName": "appointment_id"
+      },
+      "id": "7cb9ec75-1b85-417d-a4f2-25b14179dbf7",
+      "name": "Crypto - Generate Appointment ID",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        480,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{$env.GOOGLE_SHEETS_SPREADSHEET_ID}}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "appointment_id": "={{$json.appointment_id}}",
+            "doctor": "={{$('Input - Appointment Request').item.json.payload.doctor}}",
+            "clinic_id": "={{$('Input - Appointment Request').item.json.payload.clinic_id}}",
+            "patient_name": "={{$('Input - Appointment Request').item.json.payload.patient_name}}",
+            "phone": "={{$('Input - Appointment Request').item.json.payload.phone}}",
+            "date": "={{$('Input - Appointment Request').item.json.payload.date}}",
+            "time": "={{$('Input - Appointment Request').item.json.payload.time}}",
+            "duration_min": "={{$('Input - Appointment Request').item.json.payload.duration_min || 30}}",
+            "reason": "={{$('Input - Appointment Request').item.json.payload.reason}}",
+            "status": "booked",
+            "created_at": "={{$now.toISO()}}",
+            "updated_at": "={{$now.toISO()}}",
+            "source_channel": "={{$('Input - Appointment Request').item.json.payload.source_channel}}"
+          }
+        },
+        "options": {}
+      },
+      "id": "95384432-9560-42be-a1eb-81d5e16f10cb",
+      "name": "Google Sheets - Append Appointment",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        192
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "w1",
+              "name": "status",
+              "type": "string",
+              "value": "confirmed"
+            },
+            {
+              "id": "w2",
+              "name": "appointment",
+              "type": "object",
+              "value": "={{$json}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2ce3b54a-234a-497e-ab81-a43f47458e2e",
+      "name": "Format Output - Write Confirmed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        960,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "wr1",
+              "name": "status",
+              "type": "string",
+              "value": "rejected"
+            },
+            {
+              "id": "wr2",
+              "name": "rejection_reason",
+              "type": "string",
+              "value": "Requested slot is already booked (double-booking prevented)."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "66de9eef-fd26-478a-893c-ae89c67669ca",
+      "name": "Set - Slot Conflict Rejection",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{$env.GOOGLE_SHEETS_SPREADSHEET_ID}}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "appointment_id"
+          ],
+          "value": {
+            "appointment_id": "={{$json.payload.appointment_id}}",
+            "doctor": "={{$json.payload.doctor}}",
+            "date": "={{$json.payload.date}}",
+            "time": "={{$json.payload.time}}",
+            "duration_min": "={{$json.payload.duration_min}}",
+            "reason": "={{$json.payload.reason}}",
+            "status": "rescheduled",
+            "updated_at": "={{$now.toISO()}}"
+          }
+        },
+        "options": {}
+      },
+      "id": "a39100be-4f06-425f-8da7-c8af0550739b",
+      "name": "Google Sheets - Update Appointment",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        0,
+        656
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "u1",
+              "name": "status",
+              "type": "string",
+              "value": "confirmed"
+            },
+            {
+              "id": "u2",
+              "name": "appointment",
+              "type": "object",
+              "value": "={{$json}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7f17b58b-5c5e-498f-b225-0983596d79ce",
+      "name": "Format Output - Update",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "appointment_id",
+              "type": "string",
+              "value": "={{$json.payload.appointment_id}}"
+            },
+            {
+              "id": "c2",
+              "name": "status",
+              "type": "string",
+              "value": "cancelled"
+            },
+            {
+              "id": "c3",
+              "name": "updated_at",
+              "type": "string",
+              "value": "={{$now.toISO()}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ff6567db-8ff8-4491-ba7f-2ca9256034e6",
+      "name": "Set - Prepare Cancel Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{$env.GOOGLE_SHEETS_SPREADSHEET_ID}}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "appointment_id"
+          ],
+          "value": {
+            "appointment_id": "={{$json.appointment_id}}",
+            "status": "={{$json.status}}",
+            "updated_at": "={{$json.updated_at}}"
+          }
+        },
+        "options": {}
+      },
+      "id": "a4510041-3091-48f2-adb3-a1eaee28ea60",
+      "name": "Google Sheets - Cancel Appointment",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        176,
+        880
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cc1",
+              "name": "status",
+              "type": "string",
+              "value": "confirmed"
+            },
+            {
+              "id": "cc2",
+              "name": "appointment",
+              "type": "object",
+              "value": "={{$json}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d5d4543a-8014-4deb-8a40-0a0d6682ee7e",
+      "name": "Format Output - Cancel",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "i1",
+              "name": "status",
+              "type": "string",
+              "value": "rejected"
+            },
+            {
+              "id": "i2",
+              "name": "rejection_reason",
+              "type": "string",
+              "value": "Invalid or missing 'action'. Expected one of: read, write, update, cancel."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c65cc2ad-2c17-4b28-bbd8-6f9a876cc67c",
+      "name": "Set - Invalid Action Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{$env.GOOGLE_SHEETS_SPREADSHEET_ID}}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PendingWrites",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{$now.toISO()}}",
+            "source_node": "SW-01b_Appointments",
+            "action": "={{$('Input - Appointment Request').item.json.action}}",
+            "payload_json": "={{JSON.stringify($('Input - Appointment Request').item.json.payload)}}",
+            "error": "={{$json.error?.message || 'Google Sheets unavailable after 3 retries'}}"
+          }
+        },
+        "options": {}
+      },
+      "id": "8061838c-4e83-429f-bb55-0e3b50dc7d80",
+      "name": "Google Sheets - Log Pending Write",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        576,
+        640
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1",
+              "name": "status",
+              "type": "string",
+              "value": "pending"
+            },
+            {
+              "id": "e2",
+              "name": "rejection_reason",
+              "type": "string",
+              "value": "Storage temporarily unavailable — request queued in PendingWrites for replay."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "866c6b31-71c2-4e8b-b056-90b84489169e",
+      "name": "Set - Storage Error Fallback",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        768,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "options": {}
+      },
+      "id": "6d69c038-a684-45df-bd41-d06bb7744673",
+      "name": "Merge - Combine Branch Outputs",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        1152,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "o1",
+              "name": "module",
+              "type": "string",
+              "value": "SW-01b_Appointments"
+            },
+            {
+              "id": "o2",
+              "name": "result",
+              "type": "object",
+              "value": "={{$json}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "640774a0-1f84-4f6b-b6f4-b69bbdf27924",
+      "name": "Output - Canonical AppointmentResult",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        32
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Input - Appointment Request": {
+      "main": [
+        [
+          {
+            "node": "Switch - Action Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Action Router": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Read Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Sheets - Check Slot Availability",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Sheets - Update Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Prepare Cancel Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Invalid Action Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Read Appointments": {
+      "main": [
+        [
+          {
+            "node": "Format Output - Read",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Sheets - Log Pending Write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Output - Read": {
+      "main": [
+        [
+          {
+            "node": "Merge - Combine Branch Outputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Check Slot Availability": {
+      "main": [
+        [
+          {
+            "node": "IF - Slot Available",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Sheets - Log Pending Write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Slot Available": {
+      "main": [
+        [
+          {
+            "node": "Crypto - Generate Appointment ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Slot Conflict Rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crypto - Generate Appointment ID": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Append Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Append Appointment": {
+      "main": [
+        [
+          {
+            "node": "Format Output - Write Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Sheets - Log Pending Write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Output - Write Confirmed": {
+      "main": [
+        [
+          {
+            "node": "Merge - Combine Branch Outputs",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Update Appointment": {
+      "main": [
+        [
+          {
+            "node": "Format Output - Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Sheets - Log Pending Write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Prepare Cancel Fields": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Cancel Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Cancel Appointment": {
+      "main": [
+        [
+          {
+            "node": "Format Output - Cancel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Sheets - Log Pending Write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Log Pending Write": {
+      "main": [
+        [
+          {
+            "node": "Set - Storage Error Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge - Combine Branch Outputs": {
+      "main": [
+        [
+          {
+            "node": "Output - Canonical AppointmentResult",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "e1a51248-6df4-4719-a928-37e088d54865",
+  "meta": {
+    "instanceId": "aba10e44cce8963ab17711ef7157202c5c8df3fafa0caf471cf4465c447c3faa"
+  },
+  "nodeGroups": [],
+  "id": "goNVkSJceD4fqlBO",
+  "tags": []
+}

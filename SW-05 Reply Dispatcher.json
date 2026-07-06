@@ -1,0 +1,760 @@
+{
+  "name": "SW-05 Reply Dispatcher",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"workflow_source\": \"SW-03_Scheduler\",\n  \"event\": \"Appointment Confirmation\",\n  \"language\": \"French\",\n  \"patient_name\": \"\",\n  \"payload\": {}\n}"
+      },
+      "id": "7fd52ed1-be24-482b-bfff-208f3871f45f",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const allowedEvents = [\n  'Greeting', 'Appointment Confirmation', 'Appointment Cancellation', 'Appointment Reschedule',\n  'Reminder', 'Follow-up', 'Human Handoff', 'Error', 'Emergency', 'General Information'\n];\n\nconst languageMap = {\n  'french': 'fr', 'francais': 'fr', 'fran\\u00e7ais': 'fr', 'fr': 'fr', 'fr-fr': 'fr',\n  'arabic': 'ar', 'arabe': 'ar', 'ar': 'ar', 'ar-tn': 'ar', 'ar-ma': 'ar',\n  'english': 'en', 'anglais': 'en', 'en': 'en', 'en-us': 'en', 'en-gb': 'en'\n};\n\nconst rawLanguage = ($json.language || '').toString().trim().toLowerCase();\nconst language = languageMap[rawLanguage] || 'fr';\n\nconst event = $json.event;\nconst workflow_source = $json.workflow_source || 'unknown';\nconst patient_name = $json.patient_name || '';\nconst payload = $json.payload || {};\nconst channel = (payload.channel || payload.source_channel || 'whatsapp').toString().toLowerCase();\nconst clinic_id = payload.clinic_id || 'default';\n\nif (!event || !allowedEvents.includes(event)) {\n  return { json: { valid: false, error: `Unsupported or missing event: \"${event}\"`, event: event || null, language, channel, workflow_source, patient_name, payload, clinic_id } };\n}\n\nreturn { json: { valid: true, error: null, event, language, channel, workflow_source, patient_name, payload, clinic_id } };"
+      },
+      "id": "37c9ba9d-edae-4456-ac59-0b34d43dd423",
+      "name": "Validate Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "v1",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "dcc43893-a007-40e1-8d2a-df923b0ec1fb",
+      "name": "IF: Valid Request",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        928,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_CFG01_WORKFLOW_ID",
+          "cachedResultName": "CFG-01_Configuration"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "getClinicInfo",
+            "doctor_id": "",
+            "clinic_id": "={{ $json.clinic_id }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "8a3e3ae2-823e-4936-b914-72107d70fbef",
+      "name": "Get Clinic Branding (CFG-01)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1168,
+        560
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const ctx = $('Validate Request').first().json;\nconst cfgResult = $json;\nlet clinicData = {};\nif (cfgResult && cfgResult.success && cfgResult.data) {\n  clinicData = cfgResult.data;\n}\n\nreturn { json: {\n  event: ctx.event,\n  language: ctx.language,\n  channel: ctx.channel,\n  patient_name: ctx.patient_name,\n  payload: ctx.payload,\n  workflow_source: ctx.workflow_source,\n  clinic_name: clinicData.clinic_name || null,\n  clinic_phone: clinicData.phone || null,\n  clinic_whatsapp: clinicData.whatsapp_number || null,\n  clinic_address: clinicData.address || null\n} };"
+      },
+      "id": "9ed373be-8470-41a4-af04-b94a446a6c3d",
+      "name": "Build Merged Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_REPLYDISPATCHER_SPREADSHEET_ID",
+          "cachedResultName": "Medical Receptionist - Reply Dispatcher"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "MessageTemplates",
+          "cachedResultName": "MessageTemplates"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "event",
+              "lookupValue": "={{ $json.event }}"
+            },
+            {
+              "lookupColumn": "language",
+              "lookupValue": "={{ $json.language }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a4ba82ed-656d-4319-be70-ff76d8bbd941",
+      "name": "Get Message Template",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1648,
+        560
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nconst ctx = $('Build Merged Context').first().json;\n\nif (rows.length === 0) {\n  return [{ json: { ...ctx, found: false } }];\n}\n\nlet match = rows.find(r => r.channel === ctx.channel);\nif (!match) match = rows.find(r => !r.channel || r.channel === 'any' || r.channel === '');\nif (!match) match = rows[0];\n\nreturn [{ json: { ...ctx, found: true, template_id: match.template_id, template_body: match.template_body } }];"
+      },
+      "id": "0151ab5b-7553-4541-9db7-e763f6dc4ee2",
+      "name": "Pick Best Template",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1888,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "f1",
+              "leftValue": "={{ $json.found }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "37863e0c-e9e1-4e11-bf89-b380d615f301",
+      "name": "IF: Template Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2128,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const ctx = $json;\nconst p = ctx.payload || {};\nconst appt = p.appointment || {};\n\nconst vars = {\n  patient_name: ctx.patient_name || '',\n  clinic_name: ctx.clinic_name || '',\n  clinic_phone: ctx.clinic_phone || '',\n  clinic_address: ctx.clinic_address || '',\n  doctor: p.doctor || appt.doctor || '',\n  date: p.date || appt.date || '',\n  time: p.time || appt.time || '',\n  reason: p.reason || appt.reason || '',\n  slots: Array.isArray(p.slots) ? p.slots.join(', ') : '',\n  rejection_reason: p.rejection_reason || ''\n};\n\nlet message = ctx.template_body || '';\nfor (const [key, value] of Object.entries(vars)) {\n  message = message.split('{{' + key + '}}').join(String(value));\n}\n\nreturn { json: { message, template_id: ctx.template_id, channel: ctx.channel, language: ctx.language } };"
+      },
+      "id": "a17099bc-a005-447a-bcf2-c5b0cb0a2b17",
+      "name": "Personalize Template",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2368,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let ctx;\nif ($json && $json.event) {\n  ctx = $json;\n} else {\n  ctx = $('Build Merged Context').first().json;\n}\n\nreturn { json: {\n  event: ctx.event,\n  language: ctx.language,\n  channel: ctx.channel,\n  patient_name: ctx.patient_name,\n  payload: ctx.payload,\n  clinic_name: ctx.clinic_name\n} };"
+      },
+      "id": "33f548ab-ab1f-4c52-bf13-54c1348e94f7",
+      "name": "Prepare AI Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2368,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-6"
+        },
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "id": "46ab4d9c-3af2-4692-a833-34776e891f8e",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        2608,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Event: {{ $json.event }}\nLanguage: {{ $json.language }}\nPatient name: {{ $json.patient_name }}\nClinic name: {{ $json.clinic_name }}\nContext payload: {{ JSON.stringify($json.payload) }}\n\nWrite a short, warm, professional patient-facing message for this event, entirely in the specified language. Reply with ONLY the message text - no quotes, no explanation, no JSON."
+      },
+      "id": "ede0eed2-f373-4c3a-9100-a4673360c57f",
+      "name": "AI Generate Message",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.6,
+      "position": [
+        2608,
+        640
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const ctx = $('Prepare AI Context').first().json;\nconst raw = $json.text !== undefined ? $json.text : ($json.response !== undefined ? $json.response : $json.output);\nconst text = (raw || '').toString().trim();\n\nif (!text) {\n  return { json: { ai_failed: true, channel: ctx.channel, language: ctx.language } };\n}\n\nreturn { json: { message: text, template_id: 'ai_generated', channel: ctx.channel, language: ctx.language } };"
+      },
+      "id": "e866bd1a-d9e5-4954-b46b-f59d25ba19e1",
+      "name": "Validate AI Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2848,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "a1",
+              "leftValue": "={{ $json.ai_failed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1add243c-fd37-4be9-ab58-02c03ff6ffaf",
+      "name": "IF: AI Output Failed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3088,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let ctx;\nif ($json && $json.channel && $json.language && !$json.message) {\n  ctx = $json;\n} else {\n  ctx = $('Prepare AI Context').first().json;\n}\n\nconst language = (ctx.language || 'fr').toLowerCase();\nconst fallback = {\n  fr: \"Merci pour votre message. Un membre de notre \\u00e9quipe reviendra vers vous tr\\u00e8s prochainement.\",\n  ar: \"\\u0634\\u0643\\u0631\\u0627\\u064b \\u0644\\u062a\\u0648\\u0627\\u0635\\u0644\\u0643\\u0645 \\u0645\\u0639\\u0646\\u0627. \\u0633\\u064a\\u062a\\u0648\\u0627\\u0635\\u0644 \\u0645\\u0639\\u0643\\u0645 \\u0623\\u062d\\u062f \\u0623\\u0641\\u0631\\u0627\\u062f \\u0641\\u0631\\u064a\\u0642\\u0646\\u0627 \\u0641\\u064a \\u0623\\u0642\\u0631\\u0628 \\u0648\\u0642\\u062a \\u0645\\u0645\\u0643\\u0646.\",\n  en: \"Thank you for reaching out. A team member will get back to you shortly.\"\n};\nconst message = fallback[language] || fallback.fr;\n\nreturn { json: { message, template_id: 'generic_fallback', channel: ctx.channel, language: ctx.language } };"
+      },
+      "id": "c7ad2ae0-2093-437e-a8c0-dbe19bb2061e",
+      "name": "Generic Fallback Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2848,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "success",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "s2",
+              "name": "channel",
+              "type": "string",
+              "value": "={{ $json.channel }}"
+            },
+            {
+              "id": "s3",
+              "name": "message",
+              "type": "string",
+              "value": "={{ $json.message }}"
+            },
+            {
+              "id": "s4",
+              "name": "template_id",
+              "type": "string",
+              "value": "={{ $json.template_id }}"
+            },
+            {
+              "id": "s5",
+              "name": "language",
+              "type": "string",
+              "value": "={{ $json.language }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "62e44cc0-61a7-4aae-957e-2c3e73bbe1f8",
+      "name": "Build Success Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3328,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1",
+              "name": "success",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "e2",
+              "name": "channel",
+              "type": "string",
+              "value": "={{ $json.channel || 'whatsapp' }}"
+            },
+            {
+              "id": "e3",
+              "name": "message",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "e4",
+              "name": "template_id",
+              "type": "string",
+              "value": "={{ null }}"
+            },
+            {
+              "id": "e5",
+              "name": "language",
+              "type": "string",
+              "value": "={{ $json.language || 'fr' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7fc91b85-c902-4d0c-8d34-d2c1e61125b5",
+      "name": "Build Error Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1168,
+        1024
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_REPLYDISPATCHER_SPREADSHEET_ID",
+          "cachedResultName": "Medical Receptionist - Reply Dispatcher"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "DispatchLog",
+          "cachedResultName": "DispatchLog"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toISO() }}",
+            "workflow_source": "={{ $('Validate Request').first().json.workflow_source }}",
+            "event": "={{ $('Validate Request').first().json.event }}",
+            "language": "={{ $json.language }}",
+            "channel": "={{ $json.channel }}",
+            "template_id": "={{ $json.template_id }}",
+            "success": "={{ $json.success }}",
+            "error": "={{ $('Validate Request').first().json.error || '' }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "0b73b589-d235-49da-921b-040e46095be8",
+      "name": "Log Dispatch",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3584,
+        832
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "7bec1968-d489-42d5-a99f-c54e13e54b7f",
+      "name": "Output",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3584,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "content": "SW-05 Reply Dispatcher\n\nPurpose\n\nRoutes outbound messages to the correct delivery workflow.\n\nResponsibilities\n\n• Select delivery channel\n• Invoke sender workflow\n• Return standardized delivery result\n\nConsumers\n\n• MW-00 Router\n\nSupported Channels\n\n• WhatsApp\n• SMS\n• Voice",
+        "height": 480,
+        "width": 432
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        464,
+        32
+      ],
+      "id": "235b8934-7e36-45bb-8158-7c2fb63b3c98",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "Routing Decision\n\nThe dispatcher contains no provider logic.\n\nIts only responsibility is selecting the correct delivery workflow.",
+        "height": 192,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1376,
+        208
+      ],
+      "id": "ce765aa7-e3bd-4ae4-bfc6-a2d40709ab48",
+      "name": "Sticky Note1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Validate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Request": {
+      "main": [
+        [
+          {
+            "node": "IF: Valid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Valid Request": {
+      "main": [
+        [
+          {
+            "node": "Get Clinic Branding (CFG-01)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Clinic Branding (CFG-01)": {
+      "main": [
+        [
+          {
+            "node": "Build Merged Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Merged Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Merged Context": {
+      "main": [
+        [
+          {
+            "node": "Get Message Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Message Template": {
+      "main": [
+        [
+          {
+            "node": "Pick Best Template",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare AI Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Best Template": {
+      "main": [
+        [
+          {
+            "node": "IF: Template Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Template Found": {
+      "main": [
+        [
+          {
+            "node": "Personalize Template",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare AI Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Personalize Template": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Context": {
+      "main": [
+        [
+          {
+            "node": "AI Generate Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Generate Message",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Generate Message": {
+      "main": [
+        [
+          {
+            "node": "Validate AI Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generic Fallback Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate AI Output": {
+      "main": [
+        [
+          {
+            "node": "IF: AI Output Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: AI Output Failed": {
+      "main": [
+        [
+          {
+            "node": "Generic Fallback Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generic Fallback Message": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Success Response": {
+      "main": [
+        [
+          {
+            "node": "Log Dispatch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Error Response": {
+      "main": [
+        [
+          {
+            "node": "Log Dispatch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "dec649fe-b250-47db-a239-34408bedbe40",
+  "meta": {
+    "instanceId": "aba10e44cce8963ab17711ef7157202c5c8df3fafa0caf471cf4465c447c3faa"
+  },
+  "nodeGroups": [],
+  "id": "5sV7KGKUpk5UgSjd",
+  "tags": []
+}

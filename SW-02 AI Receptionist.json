@@ -1,0 +1,772 @@
+{
+  "name": "SW-02 AI Receptionist",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "SW-02 AI Receptionist\n\nPurpose\n\nInterprets patient requests using AI and produces a structured AgentResult.\n\nCalls Scheduler only when required.scheduler_result, channel, needs_human}",
+        "height": 240,
+        "width": 400
+      },
+      "id": "5ad6f41e-49e7-4fc1-baeb-3688960f507b",
+      "name": "Module Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "message",
+              "type": "object"
+            },
+            {
+              "name": "channel"
+            },
+            {
+              "name": "memory",
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "id": "3aa6c533-6354-4d16-b83b-3054e861f1aa",
+      "name": "Input - Receptionist Pipeline",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        64,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "value": "claude-sonnet-4-6"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "1390bdcd-4964-4445-bc92-9be502b97cbf",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"required\": [\"intent\", \"phone\", \"language\", \"reply_to_patient\", \"ready_for_scheduling\"],\n  \"properties\": {\n    \"intent\": { \"type\": \"string\", \"enum\": [\"new_appointment\", \"reschedule_appointment\", \"cancel_appointment\", \"emergency\", \"information_request\", \"clinic_hours\", \"doctor_availability\", \"unclear\"] },\n    \"patient_name\": { \"type\": [\"string\", \"null\"] },\n    \"phone\": { \"type\": \"string\" },\n    \"language\": { \"type\": \"string\", \"enum\": [\"fr\", \"ar\", \"en\"] },\n    \"doctor\": { \"type\": [\"string\", \"null\"] },\n    \"preferred_date\": { \"type\": [\"string\", \"null\"] },\n    \"preferred_time\": { \"type\": [\"string\", \"null\"] },\n    \"duration\": { \"type\": [\"integer\", \"null\"] },\n    \"reason\": { \"type\": [\"string\", \"null\"] },\n    \"existing_appointment_id\": { \"type\": [\"string\", \"null\"] },\n    \"missing_fields\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n    \"reply_to_patient\": { \"type\": \"string\" },\n    \"ready_for_scheduling\": { \"type\": \"boolean\" }\n  }\n}"
+      },
+      "id": "9f786e51-3871-4449-adf8-d9d1aff7f022",
+      "name": "PatientRequest Schema Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        592,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "t1",
+              "name": "patient_request.intent",
+              "type": "string",
+              "value": "unclear"
+            },
+            {
+              "id": "t2",
+              "name": "patient_request.phone",
+              "type": "string",
+              "value": "={{ $('Prepare AI Context').first().json.patient_phone }}"
+            },
+            {
+              "id": "t3",
+              "name": "patient_request.language",
+              "type": "string",
+              "value": "fr"
+            },
+            {
+              "id": "t4",
+              "name": "patient_request.reply_to_patient",
+              "type": "string",
+              "value": "Désolé, je rencontre une difficulté technique en ce moment — un membre de l'équipe vous contactera sous peu."
+            },
+            {
+              "id": "t5",
+              "name": "patient_request.ready_for_scheduling",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "t6",
+              "name": "scheduler_result",
+              "type": "object",
+              "value": "={{ null }}"
+            },
+            {
+              "id": "t7",
+              "name": "needs_human",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5f3bf288-cb7f-4d10-b325-a64452ca0824",
+      "name": "AI Timeout Fallback",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e59a8389-d931-4097-ba18-77acd3c9703c",
+      "name": "IF: Is Valid JSON",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        928,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.retry_count }}",
+              "rightValue": 2,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f9079a57-6ba0-4b64-bb18-34de5189f92e",
+      "name": "IF: Retry Limit Reached",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "message",
+              "type": "object",
+              "value": "={{ $('Input - Receptionist Pipeline').first().json.message }}"
+            },
+            {
+              "id": "r2",
+              "name": "channel",
+              "type": "string",
+              "value": "={{ $json.channel }}"
+            },
+            {
+              "id": "r3",
+              "name": "memory",
+              "type": "object",
+              "value": "={{ $('Input - Receptionist Pipeline').first().json.memory }}"
+            },
+            {
+              "id": "r4",
+              "name": "retry_count",
+              "type": "number",
+              "value": "={{ $json.retry_count + 1 }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0d2355f0-2084-4c1e-8150-566a2faad513",
+      "name": "Increment Retry Count",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "patient_request.intent",
+              "type": "string",
+              "value": "unclear"
+            },
+            {
+              "id": "f2",
+              "name": "patient_request.phone",
+              "type": "string",
+              "value": "={{ $json.patient_phone }}"
+            },
+            {
+              "id": "f3",
+              "name": "patient_request.language",
+              "type": "string",
+              "value": "fr"
+            },
+            {
+              "id": "f4",
+              "name": "patient_request.reply_to_patient",
+              "type": "string",
+              "value": "Désolé, pourriez-vous reformuler votre demande ? Un membre de notre équipe va également vous contacter."
+            },
+            {
+              "id": "f5",
+              "name": "patient_request.ready_for_scheduling",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "f6",
+              "name": "scheduler_result",
+              "type": "object",
+              "value": "={{ null }}"
+            },
+            {
+              "id": "f7",
+              "name": "needs_human",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "24299ff2-5de0-42d3-bef3-14ce3bc59a75",
+      "name": "Fallback - Max Retries Exceeded",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1328,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "n1",
+              "leftValue": "={{ ['new_appointment','reschedule_appointment','cancel_appointment','emergency'].includes($json.patient_request.intent) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5b20bdef-6a10-4685-bf86-248127d38001",
+      "name": "IF: Needs Scheduler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "value": "SW-03_Scheduler",
+          "mode": "list",
+          "cachedResultName": "SW-03_Scheduler"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "patient_request": "={{ $json.patient_request }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "1a588be3-45fd-4ced-8fc3-7e98d2b338e0",
+      "name": "Execute Workflow: Scheduler Pipeline",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1328,
+        112
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "clinic_name",
+              "type": "string",
+              "value": "={{ $env.CLINIC_NAME }}"
+            },
+            {
+              "id": "a2",
+              "name": "clinic_info_block",
+              "type": "string",
+              "value": "={{ $env.CLINIC_INFO_BLOCK }}"
+            },
+            {
+              "id": "a3",
+              "name": "conversation_state_json",
+              "type": "string",
+              "value": "={{ JSON.stringify($json.memory || {}) }}"
+            },
+            {
+              "id": "a4",
+              "name": "patient_message",
+              "type": "string",
+              "value": "={{ $json.message.text }}"
+            },
+            {
+              "id": "a5",
+              "name": "patient_phone",
+              "type": "string",
+              "value": "={{ $json.message.patient_phone }}"
+            },
+            {
+              "id": "a6",
+              "name": "channel",
+              "type": "string",
+              "value": "={{ $json.channel }}"
+            },
+            {
+              "id": "a7",
+              "name": "retry_count",
+              "type": "number",
+              "value": "={{ $json.retry_count ? $json.retry_count : 0 }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f05d7d75-4beb-4716-8bde-bb1c24afdc01",
+      "name": "Prepare AI Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        288,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst output = item.output || item;\nconst required = ['intent', 'phone', 'language', 'reply_to_patient', 'ready_for_scheduling'];\nconst missing = required.filter(f => output[f] === undefined || output[f] === null || output[f] === '');\nconst validIntents = ['new_appointment','reschedule_appointment','cancel_appointment','emergency','information_request','clinic_hours','doctor_availability','unclear'];\nconst validLangs = ['fr','ar','en'];\nlet valid = missing.length === 0;\nif (valid && !validIntents.includes(output.intent)) valid = false;\nif (valid && !validLangs.includes(output.language)) valid = false;\n\nconst ctx = $('Prepare AI Context').first().json;\nreturn [{\n  json: {\n    valid,\n    patient_request: output,\n    retry_count: ctx.retry_count,\n    channel: ctx.channel,\n    patient_phone: ctx.patient_phone\n  }\n}];"
+      },
+      "id": "25fb435e-98ec-4a33-8311-e246010eac45",
+      "name": "Validate AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.patient_message }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are Sana, the professional AI receptionist for {{ $json.clinic_name }}. You speak fluently in French, Arabic (Modern Standard / Tunisian dialect if the patient uses it), and English. Always reply in the SAME language the patient is using; if unclear, default to French.\n\nROLE:\n- Greet the patient professionally and warmly.\n- Identify the patient (name + phone if not already known).\n- Detect their intent: new_appointment, reschedule_appointment, cancel_appointment, emergency, information_request, clinic_hours, doctor_availability, or unclear.\n- Ask ONE follow-up question at a time to collect missing information.\n- NEVER decide or confirm an actual appointment slot yourself — that is handled by a separate scheduling system. You only collect preferences (preferred_date, preferred_time, doctor, reason, duration).\n- If the patient describes symptoms suggesting a medical emergency (chest pain, difficulty breathing, severe bleeding, loss of consciousness, stroke symptoms), set intent=\"emergency\" immediately, do not continue collecting appointment details, and instruct them to call emergency services or go to the nearest ER.\n- Use the conversation memory provided to avoid asking a question you already have the answer to.\n- Be concise, warm, and professional — this is a medical context.\n\nOUTPUT FORMAT:\nYou MUST respond with a single JSON object matching the provided schema. Do not include any text outside the JSON object. The field \"reply_to_patient\" contains exactly what should be sent back to the patient (in their language) — either your next question, an acknowledgement, emergency guidance, or a direct answer to a factual question (clinic hours, address, etc., using the CLINIC_INFO context below).\n\nCLINIC_INFO:\n{{ $json.clinic_info_block }}\n\nCONVERSATION MEMORY:\n{{ $json.conversation_state_json }}",
+          "maxIterations": 1
+        }
+      },
+      "id": "3cbaed7d-214f-4211-a41d-85453b961b87",
+      "name": "Generate AI Response",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        480,
+        352
+      ],
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "o1",
+              "name": "patient_request",
+              "type": "object",
+              "value": "={{ $json.patient_request }}"
+            },
+            {
+              "id": "o2",
+              "name": "scheduler_result",
+              "type": "object",
+              "value": "={{ $json.scheduler_result !== undefined ? $json.scheduler_result : ($json.data || null) }}"
+            },
+            {
+              "id": "o3",
+              "name": "channel",
+              "type": "string",
+              "value": "={{ $('Prepare AI Context').first().json.channel }}"
+            },
+            {
+              "id": "o4",
+              "name": "needs_human",
+              "type": "boolean",
+              "value": "={{ $json.needs_human || false }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a4812cf8-7cde-49eb-b937-a993e248371e",
+      "name": "Return AgentResult",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1728,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "p1",
+              "name": "patient_request",
+              "type": "object",
+              "value": "={{ $json.patient_request }}"
+            },
+            {
+              "id": "p2",
+              "name": "scheduler_result",
+              "type": "object",
+              "value": "={{ null }}"
+            },
+            {
+              "id": "p3",
+              "name": "needs_human",
+              "type": "boolean",
+              "value": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b3c01b77-04b0-4d45-a1d4-2c5d0a57ff5b",
+      "name": "Skip Scheduler",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1328,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "output": "input1"
+      },
+      "id": "57471748-7cd9-450c-8fd5-aefcb76ba171",
+      "name": "Merge Agent Result",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        1520,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "content": "AI Pipeline\n\nPrepare Context\n\n↓\n\nGenerate Response\n\n↓\n\nValidate JSON\n\n↓\n\nRetry if Invalid",
+        "height": 352
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        480,
+        -64
+      ],
+      "id": "50665262-d14a-43b0-9fa5-7c7d89dde7ad",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Input - Receptionist Pipeline": {
+      "main": [
+        [
+          {
+            "node": "Prepare AI Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate AI Response",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PatientRequest Schema Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Generate AI Response",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Timeout Fallback": {
+      "main": [
+        [
+          {
+            "node": "Return AgentResult",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Is Valid JSON": {
+      "main": [
+        [
+          {
+            "node": "IF: Needs Scheduler",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF: Retry Limit Reached",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Retry Limit Reached": {
+      "main": [
+        [
+          {
+            "node": "Fallback - Max Retries Exceeded",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Increment Retry Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increment Retry Count": {
+      "main": [
+        [
+          {
+            "node": "Prepare AI Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fallback - Max Retries Exceeded": {
+      "main": [
+        [
+          {
+            "node": "Return AgentResult",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Needs Scheduler": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow: Scheduler Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip Scheduler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow: Scheduler Pipeline": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Context": {
+      "main": [
+        [
+          {
+            "node": "Generate AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate AI Response": {
+      "main": [
+        [
+          {
+            "node": "IF: Is Valid JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate AI Response": {
+      "main": [
+        [
+          {
+            "node": "Validate AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Timeout Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Scheduler": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent Result",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Agent Result": {
+      "main": [
+        [
+          {
+            "node": "Return AgentResult",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "4dccbc47-259d-4344-a4df-6c64824cb3cd",
+  "meta": {
+    "instanceId": "aba10e44cce8963ab17711ef7157202c5c8df3fafa0caf471cf4465c447c3faa"
+  },
+  "nodeGroups": [],
+  "id": "LNikFcayB9sU51nn",
+  "tags": []
+}

@@ -1,0 +1,737 @@
+{
+  "name": "MW-00 Router",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "MW-00 Router\n\nPurpose\nCentral orchestration workflow.\n\nResponsibilities\n\n• Receive inbound messages\n• Validate requests\n• Normalize payloads\n• Load conversation memory\n• Prevent duplicate processing\n• Invoke AI Receptionist\n• Dispatch responses\n\nSub-workflows\n\nSW-01 Conversation Memory\nSW-02 AI Receptionist\nSW-05 Reply Dispatcher",
+        "height": 460,
+        "width": 396
+      },
+      "id": "52ee9e1e-2a0b-4612-babc-6ae16ec5f7f7",
+      "name": "Module Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        8576,
+        3072
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/whatsapp",
+        "options": {}
+      },
+      "id": "e8b9be23-e25b-4b7e-b764-3194ca88ac5d",
+      "name": "Webhook - WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        8192,
+        3584
+      ],
+      "webhookId": "mw00-whatsapp"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/sms",
+        "options": {}
+      },
+      "id": "328272e4-7c3d-4de4-b03d-9f517dd50e33",
+      "name": "Webhook - SMS",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        8192,
+        3776
+      ],
+      "webhookId": "mw00-sms"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/voice/turn",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "81362d6d-0ee5-4aff-9b70-50f25797dc4f",
+      "name": "Webhook - Voice Turn",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        8192,
+        3968
+      ],
+      "webhookId": "mw00-voice-turn"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "options": {}
+      },
+      "id": "c83aa267-480e-4492-834e-352c5d407aa5",
+      "name": "Merge - Message + Memory",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        9312,
+        3776
+      ],
+      "notes": "Combines the normalized Message (input 1) with the loaded ConversationState (input 2) by position, since Execute Workflow output otherwise replaces the incoming item."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.message_id }}",
+              "rightValue": "={{ $json.last_message_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "999eb36f-d951-49ee-8fe2-3965c70b20a2",
+      "name": "Idempotency Guard",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        9536,
+        3776
+      ],
+      "notes": "Drops duplicate deliveries (Twilio/Meta retries) by comparing the incoming message_id against ConversationState.last_message_id."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "3bb45959-983f-411a-bd83-f296d78f59ed",
+      "name": "Merge - AgentResult + Channel Info",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        9984,
+        3680
+      ],
+      "notes": "Re-attaches channel/phone/call_sid (needed by the Reply Dispatcher) to the AgentResult returned by the Receptionist pipeline."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.channel }}",
+              "rightValue": "voice",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "78f90867-0df4-41e3-b4c5-a12552cd618c",
+      "name": "IF - Needs TwiML Response",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        10432,
+        3680
+      ],
+      "notes": "Only the Voice Turn webhook is waiting on a synchronous HTTP response. WhatsApp/SMS were already acked immediately on receipt."
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Gather input=\"speech\" action=\"/webhook/voice/turn\" method=\"POST\" speechTimeout=\"auto\"><Say>{{ $json.text }}</Say></Gather></Response>",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml"
+              }
+            ]
+          }
+        }
+      },
+      "id": "11bfc3b8-71a7-46cd-8f4f-71075f2a9f4d",
+      "name": "Respond to Webhook - Voice TwiML",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        10656,
+        3584
+      ],
+      "notes": "Returns TwiML that speaks the reply back to the caller and re-opens a <Gather> so the conversation continues on the same call."
+    },
+    {
+      "parameters": {},
+      "id": "cd3d4ec9-d4ca-4ba6-a756-ba6f74e92501",
+      "name": "No Further Response Needed",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        10656,
+        3776
+      ],
+      "notes": "WhatsApp/SMS: the outbound message was already sent by the Reply Dispatcher's HTTP send nodes; the webhook itself was acked on receipt."
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "SW-01_Memory",
+          "cachedResultName": "SW-01_Memory"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "patient_phone": "={{ $json.patient_phone }}",
+            "channel": "={{ $json.channel }}",
+            "action": "get",
+            "payload": {}
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "5b293ecd-0c4b-46b7-9404-ac18a7a25d0c",
+      "name": "Load Conversation Memory",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        9088,
+        3856
+      ],
+      "notes": "Calls SW-01_Memory in 'get' mode to fetch existing ConversationState for this phone number."
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "SW-02_Receptionist",
+          "cachedResultName": "SW-02_Receptionist"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "message": {
+              "message_id": "={{ $json.message_id }}",
+              "channel": "={{ $json.channel }}",
+              "patient_phone": "={{ $json.patient_phone }}",
+              "text": "={{ $json.text }}",
+              "timestamp": "={{ $json.timestamp }}"
+            },
+            "channel": "={{ $json.channel }}",
+            "memory": "={{ $json }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "d769c691-6445-40b0-8a5e-8ad46d40c24e",
+      "name": "Run AI Receptionist",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        9760,
+        3680
+      ],
+      "notes": "Calls SW-02_Receptionist (Agent 1) with the message + loaded memory, returns the canonical AgentResult."
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "SW-05_ReplyDispatcher",
+          "cachedResultName": "SW-05_ReplyDispatcher"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel": "={{ $json.channel }}",
+            "phone": "={{ $json.patient_phone }}",
+            "text": "={{ $json.reply_to_patient }}",
+            "callSid": "={{ $json.call_sid || null }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "e4584a28-2dfd-48da-835d-ff90f3bb3a7a",
+      "name": "Dispatch Reply",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        10208,
+        3680
+      ],
+      "notes": "Calls SW-05_ReplyDispatcher which sends the reply on the correct channel (WhatsApp/SMS via HTTP, Voice via returned TwiML text)."
+    },
+    {
+      "parameters": {},
+      "id": "165ec63c-0547-4dd7-bb5b-c2314be05d2e",
+      "name": "Ignore Duplicate",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        9760,
+        3872
+      ],
+      "notes": "Terminal node for retried/duplicate webhook deliveries. Nothing further happens on this branch."
+    },
+    {
+      "parameters": {
+        "content": "Converts WhatsApp, SMS, and Voice payloads into a common message format used by downstream workflows.",
+        "height": 240,
+        "width": 160,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        8832,
+        3936
+      ],
+      "id": "9800b288-9243-434a-95d0-df88f96fd998",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "jsCode": "const signature = $input.first().json.headers['x-hub-signature-256'];\nif (!signature) {\n  throw new Error('Missing Meta X-Hub-Signature-256 header - rejecting request');\n}\nreturn $input.all();"
+      },
+      "id": "75ba9ea3-570e-4745-9e4c-76beda6de993",
+      "name": "Verify WA Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8416,
+        3584
+      ],
+      "notes": "Minimal guard: confirms Meta's X-Hub-Signature-256 header is present before proceeding. Replace with full HMAC verification against META_WHATSAPP_VERIFY_TOKEN in production."
+    },
+    {
+      "parameters": {
+        "jsCode": "const signature = $input.first().json.headers['x-twilio-signature'];\nif (!signature) {\n  throw new Error('Missing Twilio X-Twilio-Signature header - rejecting request');\n}\nreturn $input.all();"
+      },
+      "id": "cfb33fa4-bb69-45d4-833c-1a95696d9839",
+      "name": "Verify SMS Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8416,
+        3776
+      ],
+      "notes": "Minimal guard: confirms Twilio's X-Twilio-Signature header is present before proceeding. Replace with full HMAC verification against TWILIO_AUTH_TOKEN in production."
+    },
+    {
+      "parameters": {
+        "jsCode": "const signature = $input.first().json.headers['x-twilio-signature'];\nif (!signature) {\n  throw new Error('Missing Twilio X-Twilio-Signature header - rejecting request');\n}\nreturn $input.all();"
+      },
+      "id": "19c154e1-8f63-4319-8fb4-4267f7e863ee",
+      "name": "Verify Voice Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8416,
+        3968
+      ],
+      "notes": "Minimal guard: confirms Twilio's X-Twilio-Signature header is present before proceeding. Replace with full HMAC verification against TWILIO_AUTH_TOKEN in production."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "channel",
+              "type": "string",
+              "value": "whatsapp"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "40406266-de2f-4ab6-849e-b260bc54ad08",
+      "name": "Set Channel: WhatsApp",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        8640,
+        3584
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "channel",
+              "type": "string",
+              "value": "sms"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9b8a5220-ac58-42ba-9fdc-f0190d3669b1",
+      "name": "Set Channel: SMS",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        8640,
+        3776
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "channel",
+              "type": "string",
+              "value": "voice"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "916afaed-afbd-4c83-9949-2c1eda0bfebe",
+      "name": "Set Channel: Voice",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        8640,
+        3968
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "m1",
+              "name": "message_id",
+              "type": "string",
+              "value": "={{ $json.body.MessageSid || $json.body.SmsSid || ($json.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.id) || $json.body.CallSid }}"
+            },
+            {
+              "id": "m2",
+              "name": "channel",
+              "type": "string",
+              "value": "={{ $json.channel }}"
+            },
+            {
+              "id": "m3",
+              "name": "patient_phone",
+              "type": "string",
+              "value": "={{ $json.body.From || ($json.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.from) }}"
+            },
+            {
+              "id": "m4",
+              "name": "text",
+              "type": "string",
+              "value": "={{ $json.body.Body || ($json.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.text?.body) || $json.body.SpeechResult }}"
+            },
+            {
+              "id": "m5",
+              "name": "call_sid",
+              "type": "string",
+              "value": "={{ $json.body.CallSid || null }}"
+            },
+            {
+              "id": "m6",
+              "name": "timestamp",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e384eedb-f46e-46a8-9a5c-e1a13511f041",
+      "name": "Normalize Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        8864,
+        3776
+      ],
+      "notes": "Maps every channel's raw payload into the canonical Message object (see architecture doc section 4.1)."
+    },
+    {
+      "parameters": {
+        "content": "End of Router\n\nThe Router never sends messages itself.\n\nDelivery is delegated to the Reply Dispatcher.",
+        "height": 192,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        10880,
+        3648
+      ],
+      "id": "1b641eb9-b3c1-4a9e-964f-18eacd0108d2",
+      "name": "Sticky Note1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Verify WA Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - SMS": {
+      "main": [
+        [
+          {
+            "node": "Verify SMS Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Voice Turn": {
+      "main": [
+        [
+          {
+            "node": "Verify Voice Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge - Message + Memory": {
+      "main": [
+        [
+          {
+            "node": "Idempotency Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Idempotency Guard": {
+      "main": [
+        [
+          {
+            "node": "Run AI Receptionist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ignore Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge - AgentResult + Channel Info": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Needs TwiML Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook - Voice TwiML",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Further Response Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Conversation Memory": {
+      "main": [
+        [
+          {
+            "node": "Merge - Message + Memory",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Run AI Receptionist": {
+      "main": [
+        [
+          {
+            "node": "Merge - AgentResult + Channel Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Reply": {
+      "main": [
+        [
+          {
+            "node": "IF - Needs TwiML Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify WA Signature": {
+      "main": [
+        [
+          {
+            "node": "Set Channel: WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify SMS Signature": {
+      "main": [
+        [
+          {
+            "node": "Set Channel: SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Voice Signature": {
+      "main": [
+        [
+          {
+            "node": "Set Channel: Voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Channel: WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Normalize Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Channel: SMS": {
+      "main": [
+        [
+          {
+            "node": "Normalize Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Channel: Voice": {
+      "main": [
+        [
+          {
+            "node": "Normalize Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Payload": {
+      "main": [
+        [
+          {
+            "node": "Load Conversation Memory",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge - Message + Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "2695e45b-bd50-4149-a22b-768e5b2c8377",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "aba10e44cce8963ab17711ef7157202c5c8df3fafa0caf471cf4465c447c3faa"
+  },
+  "nodeGroups": [],
+  "id": "NAmIn7gyPJ9ZDhGY",
+  "tags": []
+}

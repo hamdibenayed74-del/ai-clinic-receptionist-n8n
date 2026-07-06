@@ -1,0 +1,672 @@
+{
+  "name": "SW-06 WhatsApp Sender",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "SW-06 WhatsApp Sender\n\nPurpose\n\nDedicated delivery workflow for WhatsApp messages.\n\nResponsibilities\n\n• Validate outbound requests\n• Build WhatsApp API payload\n• Send message\n• Retry failed deliveries\n• Log delivery status\n\nConsumers\n\n• SW-05 Reply Dispatcher",
+        "height": 396,
+        "width": 520
+      },
+      "id": "118660e1-aedf-4088-8953-f3fb668925a2",
+      "name": "Sticky Note - Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        336,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const allowedTypes = ['text', 'image', 'document', 'interactive'];\n\nconst recipient = ($json.recipient || '').toString().trim();\nconst message_type = ($json.message_type || 'text').toString().trim().toLowerCase();\nconst message = $json.message || '';\nconst attachments = Array.isArray($json.attachments) ? $json.attachments : [];\nconst language = $json.language || '';\nconst metadata = $json.metadata || {};\nconst phoneDigits = recipient.replace(/[^0-9]/g, '');\n\nconst base = { recipient, message_type, message, attachments, language, metadata };\n\nif (!recipient || phoneDigits.length < 8) {\n  return { json: { valid: false, error: 'A valid recipient phone number is required.', ...base } };\n}\n\nif (!allowedTypes.includes(message_type)) {\n  return { json: { valid: false, error: `Unsupported message_type: \"${message_type}\"`, ...base } };\n}\n\nif (message_type === 'text' && !message) {\n  return { json: { valid: false, error: 'message is required for message_type \"text\".', ...base } };\n}\n\nif ((message_type === 'image' || message_type === 'document') && (attachments.length === 0 || !(attachments[0].url || attachments[0].id))) {\n  return { json: { valid: false, error: `attachments[0].url or attachments[0].id is required for message_type \"${message_type}\".`, ...base } };\n}\n\nif (message_type === 'interactive' && !metadata.interactive_type) {\n  return { json: { valid: false, error: 'metadata.interactive_type (\"button\" or \"list\") is required for message_type \"interactive\".', ...base } };\n}\n\nreturn { json: { valid: true, error: null, ...base } };"
+      },
+      "id": "9a780e3f-8dbd-4dfd-9eb6-7dbd9ca2e246",
+      "name": "Validate Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "v1",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d6e7f99e-c6c4-4247-9fba-1a151218da58",
+      "name": "IF: Valid Request",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        928,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const ctx = $json;\nconst to = ctx.recipient.replace(/[^0-9]/g, '');\nlet payload = { messaging_product: 'whatsapp', to, type: ctx.message_type };\n\nif (ctx.message_type === 'text') {\n  payload.text = { body: ctx.message, preview_url: false };\n}\n\nif (ctx.message_type === 'image') {\n  const att = ctx.attachments[0];\n  payload.image = att.id ? { id: att.id } : { link: att.url };\n  if (ctx.message) payload.image.caption = ctx.message;\n}\n\nif (ctx.message_type === 'document') {\n  const att = ctx.attachments[0];\n  payload.document = att.id ? { id: att.id } : { link: att.url };\n  if (att.filename) payload.document.filename = att.filename;\n  if (ctx.message) payload.document.caption = ctx.message;\n}\n\nif (ctx.message_type === 'interactive') {\n  const meta = ctx.metadata || {};\n  if (meta.interactive_type === 'button') {\n    payload.interactive = {\n      type: 'button',\n      body: { text: ctx.message || '' },\n      action: {\n        buttons: (meta.buttons || []).slice(0, 3).map((b, idx) => ({\n          type: 'reply',\n          reply: { id: b.id || `btn_${idx}`, title: (b.title || '').substring(0, 20) }\n        }))\n      }\n    };\n  } else if (meta.interactive_type === 'list') {\n    payload.interactive = {\n      type: 'list',\n      body: { text: ctx.message || '' },\n      action: {\n        button: meta.list_button_text || 'Options',\n        sections: meta.list_sections || []\n      }\n    };\n  } else {\n    payload = { messaging_product: 'whatsapp', to, type: 'text', text: { body: ctx.message || '' } };\n  }\n}\n\nreturn { json: { whatsapp_payload: payload, recipient: ctx.recipient, message_type: ctx.message_type, language: ctx.language, metadata: ctx.metadata } };"
+      },
+      "id": "d78150f8-be4e-43d1-9fad-84bd6ab49881",
+      "name": "Build WhatsApp Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/' + ($env.WHATSAPP_API_VERSION || 'v20.0') + '/' + $env.WHATSAPP_PHONE_NUMBER_ID + '/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.WHATSAPP_ACCESS_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.whatsapp_payload) }}",
+        "options": {}
+      },
+      "id": "8744fb9c-1020-41f7-8963-2354d6c46352",
+      "name": "Send Attempt 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1408,
+        544
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const body = $json.body || $json;\nconst message_id = (body.messages && body.messages[0] && body.messages[0].id) || null;\nreturn { json: { message_id, attempts: 1, error: null } };"
+      },
+      "id": "56e2b0e6-cf20-4410-89d9-6b4e4467aed4",
+      "name": "Parse Response - Attempt 1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "id": "96a9b6dd-a4da-4a0f-87a1-22f985cc6173",
+      "name": "Wait 2s Before Retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1648,
+        624
+      ],
+      "webhookId": "059048e9-597d-4fcf-a487-a615d378ebbc"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/' + ($env.WHATSAPP_API_VERSION || 'v20.0') + '/' + $env.WHATSAPP_PHONE_NUMBER_ID + '/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.WHATSAPP_ACCESS_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Build WhatsApp Payload').item.json.whatsapp_payload) }}",
+        "options": {}
+      },
+      "id": "ecb201e9-5d3f-4bc1-bf17-81f172f2d754",
+      "name": "Send Attempt 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1888,
+        624
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const body = $json.body || $json;\nconst message_id = (body.messages && body.messages[0] && body.messages[0].id) || null;\nreturn { json: { message_id, attempts: 2, error: null } };"
+      },
+      "id": "94d5d8b8-5ae7-44dd-8555-599b2f0d69c3",
+      "name": "Parse Response - Attempt 2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2128,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 4
+      },
+      "id": "029eff06-9eda-439a-bf78-4284eab3f07b",
+      "name": "Wait 4s Before Retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2128,
+        752
+      ],
+      "webhookId": "17a19517-1774-4788-9954-94a58726087c"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/' + ($env.WHATSAPP_API_VERSION || 'v20.0') + '/' + $env.WHATSAPP_PHONE_NUMBER_ID + '/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.WHATSAPP_ACCESS_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Build WhatsApp Payload').item.json.whatsapp_payload) }}",
+        "options": {}
+      },
+      "id": "1365502c-6f23-49db-bfd7-13fd09b1da3c",
+      "name": "Send Attempt 3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2368,
+        752
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const body = $json.body || $json;\nconst message_id = (body.messages && body.messages[0] && body.messages[0].id) || null;\nreturn { json: { message_id, attempts: 3, error: null } };"
+      },
+      "id": "cacf45bf-7d98-47ea-8408-507579e8fc23",
+      "name": "Parse Response - Attempt 3",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2608,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const err = $json.error;\nconst message = (err && (err.message || err)) ? (err.message || String(err)) : 'WhatsApp API request failed after 3 attempts.';\nreturn { json: { success: false, message_id: null, status: 'failed', provider: 'whatsapp', attempts: 3, error: message } };"
+      },
+      "id": "e6dca056-ec54-4e5a-a161-676b0b234912",
+      "name": "Build Delivery Error Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2608,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "success",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "s2",
+              "name": "message_id",
+              "type": "string",
+              "value": "={{ $json.message_id }}"
+            },
+            {
+              "id": "s3",
+              "name": "status",
+              "type": "string",
+              "value": "sent"
+            },
+            {
+              "id": "s4",
+              "name": "provider",
+              "type": "string",
+              "value": "whatsapp"
+            },
+            {
+              "id": "s5",
+              "name": "attempts",
+              "type": "number",
+              "value": "={{ $json.attempts }}"
+            },
+            {
+              "id": "s6",
+              "name": "error",
+              "type": "string",
+              "value": "={{ null }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5409d631-bebb-4ea5-91ba-647e6c433e3b",
+      "name": "Build Success Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2848,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1",
+              "name": "success",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "e2",
+              "name": "message_id",
+              "type": "string",
+              "value": "={{ null }}"
+            },
+            {
+              "id": "e3",
+              "name": "status",
+              "type": "string",
+              "value": "invalid_request"
+            },
+            {
+              "id": "e4",
+              "name": "provider",
+              "type": "string",
+              "value": "whatsapp"
+            },
+            {
+              "id": "e5",
+              "name": "attempts",
+              "type": "number",
+              "value": 0
+            },
+            {
+              "id": "e6",
+              "name": "error",
+              "type": "string",
+              "value": "={{ $json.error }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9c8a7497-337f-4e22-86d9-0365c9027f06",
+      "name": "Build Error Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1168,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_WHATSAPPSENDER_SPREADSHEET_ID",
+          "cachedResultName": "Medical Receptionist - WhatsApp Sender"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "DeliveryLog",
+          "cachedResultName": "DeliveryLog"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toISO() }}",
+            "recipient": "={{ $('Validate Request').first().json.recipient }}",
+            "message_type": "={{ $('Validate Request').first().json.message_type }}",
+            "status": "={{ $json.status }}",
+            "message_id": "={{ $json.message_id }}",
+            "attempts": "={{ $json.attempts }}",
+            "error": "={{ $json.error || '' }}",
+            "language": "={{ $('Validate Request').first().json.language }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "7e2039d1-294e-43ae-aab0-e314d1cd2dcc",
+      "name": "Log Delivery",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3104,
+        704
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"recipient\": \"+21650000000\",\n  \"message_type\": \"text\",\n  \"message\": \"\",\n  \"attachments\": [],\n  \"language\": \"fr\",\n  \"metadata\": {}\n}"
+      },
+      "id": "fb0f2cc1-d5c5-479f-97fe-39a7a08aaca5",
+      "name": "Receive Delivery Request",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        640
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "51ff18c3-9679-4b8d-b13c-cee24ecf0980",
+      "name": "Return Delivery Result",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3344,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "content": "Provider Translation\n\nInternal Message\n\n↓\n\nWhatsApp Cloud API Payload\n\nThis workflow is responsible\nfor provider-specific formatting.",
+        "height": 240,
+        "width": 368
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        976,
+        160
+      ],
+      "id": "d655877e-fca2-4bac-9892-eef0a0831592",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Validate Request": {
+      "main": [
+        [
+          {
+            "node": "IF: Valid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Valid Request": {
+      "main": [
+        [
+          {
+            "node": "Build WhatsApp Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build WhatsApp Payload": {
+      "main": [
+        [
+          {
+            "node": "Send Attempt 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Attempt 1": {
+      "main": [
+        [
+          {
+            "node": "Parse Response - Attempt 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 2s Before Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Response - Attempt 1": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2s Before Retry": {
+      "main": [
+        [
+          {
+            "node": "Send Attempt 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Attempt 2": {
+      "main": [
+        [
+          {
+            "node": "Parse Response - Attempt 2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 4s Before Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Response - Attempt 2": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 4s Before Retry": {
+      "main": [
+        [
+          {
+            "node": "Send Attempt 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Attempt 3": {
+      "main": [
+        [
+          {
+            "node": "Parse Response - Attempt 3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Delivery Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Response - Attempt 3": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Delivery Error Response": {
+      "main": [
+        [
+          {
+            "node": "Log Delivery",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Return Delivery Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Success Response": {
+      "main": [
+        [
+          {
+            "node": "Log Delivery",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Return Delivery Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Error Response": {
+      "main": [
+        [
+          {
+            "node": "Log Delivery",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Return Delivery Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive Delivery Request": {
+      "main": [
+        [
+          {
+            "node": "Validate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "b23756e4-67e8-4a9c-b042-2c0c185d326d",
+  "meta": {
+    "instanceId": "aba10e44cce8963ab17711ef7157202c5c8df3fafa0caf471cf4465c447c3faa"
+  },
+  "nodeGroups": [],
+  "id": "R2RYpOIevSOHE8Es",
+  "tags": []
+}
