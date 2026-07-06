@@ -39,7 +39,7 @@ The project simulates an AI-powered clinic receptionist capable of understanding
 ---
 
 # 🏗️ Architecture
-https://github.com/hamdibenayed74-del/ai-clinic-receptionist-n8n/blob/main/architecture.png.png?raw=true
+docs/ architecture.png
 ---
 
 # 📂 Workflow Overview
@@ -159,15 +159,17 @@ The project is built around several software engineering principles:
 ---
 
 # 📸 Screenshots
+docs/screenshots/router.png
 
-Screenshots of the main workflows will be added here.
+docs/screenshots/ai-receptionist.png
 
-* MW-00 Router
-* SW-02 AI Receptionist
-* SW-03 Appointment Scheduler
-* SW-06 WhatsApp Sender
-* System Architecture
+docs/screenshots/appointment-scheduler.png
 
+docs/screenshots/configuration.png
+
+docs/screenshots/whatsapp-sender.png
+
+docs/screenshots/error-handler.png
 ---
 
 # 🎥 Demo
@@ -195,6 +197,6 @@ This project is licensed under the MIT License.
 
 # 👨‍💻 Author
 
-**Taleb Rkik**
+**HAMDI BEN AYED**
 
 Built as a portfolio project to demonstrate automation architecture, workflow orchestration, and AI-powered business process automation using n8n.
