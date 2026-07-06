@@ -1,81 +1,96 @@
-# 🏥 AI Clinic Receptionist (n8n)
+# 🏥 AI Clinic Receptionist
 
-> A modular AI-powered clinic receptionist built with **n8n**, demonstrating workflow orchestration, appointment scheduling, conversation memory, WhatsApp integration, centralized configuration, and global error handling using a service-oriented architecture.
+> **A modular AI-powered clinic receptionist built with n8n, showcasing workflow orchestration, AI-driven appointment scheduling, WhatsApp integration, conversation memory, centralized configuration, and global error handling.**
+
+![n8n](https://img.shields.io/badge/n8n-Automation-EA4B71?style=for-the-badge\&logo=n8n)
+![OpenAI](https://img.shields.io/badge/OpenAI-GPT-412991?style=for-the-badge\&logo=openai)
+![WhatsApp](https://img.shields.io/badge/WhatsApp-Cloud%20API-25D366?style=for-the-badge\&logo=whatsapp)
+![Portfolio](https://img.shields.io/badge/Portfolio-Project-blue?style=for-the-badge)
 
 ---
 
-## 📖 Overview
+# 📖 Overview
 
-This project is a portfolio demonstration of designing scalable automation systems with **n8n**.
+This project demonstrates how to design a **modular automation system** using **n8n**.
 
-Instead of building one large workflow, the solution is organized into independent services that communicate through standardized contracts. Each workflow has a single responsibility, making the system easier to understand, maintain, and extend.
+Rather than building a single large workflow, the application is divided into independent services, each with a single responsibility. These workflows communicate through standardized data structures, making the system easier to understand, maintain, and extend.
 
-> **Note:** This is a learning and portfolio project. Google Sheets is intentionally used as the storage layer to keep the project simple while demonstrating workflow architecture and automation design principles.
+The project simulates an AI-powered clinic receptionist capable of understanding patient requests, managing appointment scheduling, maintaining conversation history, and delivering responses through WhatsApp.
+
+> **Note**
+>
+> This is a portfolio project created to demonstrate workflow architecture, automation design, and AI orchestration using n8n.
+>
+> Google Sheets is intentionally used as the storage backend to keep the project simple while focusing on architecture and workflow design rather than infrastructure.
 
 ---
 
 # ✨ Features
 
-* 🤖 AI-powered receptionist
-* 📅 Intelligent appointment scheduling
-* 💬 Conversation memory management
-* 📱 WhatsApp message delivery
-* ⚙️ Centralized configuration service
-* 🛡️ Global error handling
-* 🧩 Modular workflow architecture
-* 🔄 Reusable workflow contracts
-* 📊 Structured logging and validation
+* 🤖 AI Receptionist
+* 📅 Intelligent Appointment Scheduling
+* 💬 Conversation Memory
+* 📱 WhatsApp Cloud API Integration
+* ⚙️ Centralized Configuration Service
+* 🛡️ Global Error Handling
+* 🔄 Modular Workflow Architecture
+* 📊 Structured Validation & Logging
 
 ---
 
-# 🏗️ System Architecture
+# 🏗️ Architecture
 
-```text
-                Patient
-                   │
-                   ▼
-          MW-00 Router
-                   │
-                   ▼
-      SW-02 AI Receptionist
-                   │
-                   ▼
-   SW-03 Appointment Scheduler
-                   │
-                   ▼
- SW-01B Appointment Storage
-                   ▲
-                   │
-      CFG-01 Configuration
-                   │
-                   ▼
-    SW-05 Reply Dispatcher
-                   │
-                   ▼
-     SW-06 WhatsApp Sender
-                   │
-                   ▼
-                Patient
-
-         EW-00 Global Error Handler
-               (All Workflows)
-```
+> *(Architecture diagram will be added here.)*
 
 ---
 
 # 📂 Workflow Overview
 
-| Workflow                        | Responsibility                                                      |
-| ------------------------------- | ------------------------------------------------------------------- |
-| **MW-00 Router**                | Main orchestration workflow that coordinates the entire system.     |
-| **SW-01 Conversation Memory**   | Stores and retrieves conversation context.                          |
-| **SW-01B Appointment Storage**  | Provides a storage abstraction for appointment data.                |
-| **SW-02 AI Receptionist**       | Interprets patient requests and produces structured AI responses.   |
-| **SW-03 Appointment Scheduler** | Validates scheduling requests and coordinates appointment creation. |
-| **SW-05 Reply Dispatcher**      | Routes outgoing responses to the correct communication channel.     |
-| **SW-06 WhatsApp Sender**       | Sends outbound WhatsApp messages with retry handling.               |
-| **CFG-01 Configuration**        | Centralized provider for clinic configuration and business rules.   |
-| **EW-00 Global Error Handler**  | Captures, normalizes, logs, and classifies workflow failures.       |
+| Workflow                        | Responsibility                                                       |
+| ------------------------------- | -------------------------------------------------------------------- |
+| **MW-00 Router**                | Main orchestration workflow and system entry point.                  |
+| **SW-01 Conversation Memory**   | Stores and retrieves conversation history.                           |
+| **SW-01B Appointment Storage**  | Handles appointment persistence through a storage abstraction layer. |
+| **SW-02 AI Receptionist**       | Interprets patient requests and generates structured AI responses.   |
+| **SW-03 Appointment Scheduler** | Validates scheduling requests and coordinates appointment creation.  |
+| **SW-05 Reply Dispatcher**      | Routes responses to the appropriate communication channel.           |
+| **SW-06 WhatsApp Sender**       | Sends WhatsApp messages with validation, retry, and logging.         |
+| **CFG-01 Configuration**        | Centralized provider for clinic configuration and business rules.    |
+| **EW-00 Global Error Handler**  | Normalizes, logs, and classifies workflow errors.                    |
+
+---
+
+# 🔄 System Flow
+
+```text
+Patient Message
+        │
+        ▼
+ MW-00 Router
+        │
+        ▼
+ SW-02 AI Receptionist
+        │
+        ▼
+ SW-03 Appointment Scheduler
+        │
+        ▼
+SW-01B Appointment Storage
+        ▲
+        │
+ CFG-01 Configuration
+        │
+        ▼
+ SW-05 Reply Dispatcher
+        │
+        ▼
+ SW-06 WhatsApp Sender
+        │
+        ▼
+ Patient Response
+```
+
+Every workflow is designed around the **Single Responsibility Principle**, allowing services to evolve independently while remaining easy to maintain.
 
 ---
 
@@ -96,11 +111,6 @@ Instead of building one large workflow, the solution is organized into independe
 .
 ├── README.md
 ├── LICENSE
-├── docs/
-│   ├── architecture.png
-│   ├── workflow-map.png
-│   ├── screenshots/
-│   └── demo.gif
 │
 ├── workflows/
 │   ├── MW-00 Router.json
@@ -113,44 +123,46 @@ Instead of building one large workflow, the solution is organized into independe
 │   ├── CFG-01 Configuration.json
 │   └── EW-00 Global Error Handler.json
 │
+├── docs/
+│   ├── architecture.png
+│   ├── workflow-map.png
+│   ├── screenshots/
+│   └── demo.gif
+│
 └── examples/
-    ├── incoming-message.json
-    ├── scheduler-result.json
-    ├── agent-result.json
-    └── delivery-result.json
 ```
 
 ---
 
-# 🔄 Workflow Design Principles
+# 🎯 Design Principles
 
-This project follows several software engineering principles:
+The project is built around several software engineering principles:
 
-* **Single Responsibility Principle** — Each workflow performs one specific task.
-* **Separation of Concerns** — AI, scheduling, storage, messaging, configuration, and error handling are isolated into dedicated services.
-* **Reusable Contracts** — Workflows exchange standardized request and response objects.
-* **Configuration Centralization** — Business configuration is managed through a dedicated workflow instead of being duplicated.
-* **Fault Tolerance** — Validation, retries, and centralized error handling improve reliability.
+* **Single Responsibility Principle** — Every workflow performs one well-defined task.
+* **Separation of Concerns** — AI, scheduling, storage, messaging, configuration, and error handling are isolated into dedicated workflows.
+* **Modular Architecture** — Components communicate through standardized request and response structures.
+* **Centralized Configuration** — Business settings are managed through a single configuration service.
+* **Reliability** — Validation, retry strategies, and centralized error handling improve resilience.
 
 ---
 
-# 🚀 Example Flow
+# 🚀 Example Execution
 
 1. A patient sends a WhatsApp message.
-2. **MW-00 Router** receives the request.
+2. The Router receives the request.
 3. Conversation history is retrieved.
-4. **SW-02 AI Receptionist** interprets the request.
-5. If scheduling is required, **SW-03 Appointment Scheduler** is invoked.
-6. Appointment data is stored through **SW-01B Appointment Storage**.
-7. **SW-05 Reply Dispatcher** selects the delivery channel.
-8. **SW-06 WhatsApp Sender** sends the response.
-9. Any unexpected failures are handled by **EW-00 Global Error Handler**.
+4. The AI Receptionist interprets the patient's intent.
+5. Appointment requests are delegated to the Appointment Scheduler.
+6. Confirmed appointments are stored.
+7. The Reply Dispatcher selects the delivery channel.
+8. The WhatsApp Sender delivers the response.
+9. Unexpected failures are processed by the Global Error Handler.
 
 ---
 
 # 📸 Screenshots
 
-Add screenshots of the following workflows:
+Screenshots of the main workflows will be added here.
 
 * MW-00 Router
 * SW-02 AI Receptionist
@@ -158,37 +170,20 @@ Add screenshots of the following workflows:
 * SW-06 WhatsApp Sender
 * System Architecture
 
-Store them in:
-
-```text
-docs/screenshots/
-```
-
 ---
 
 # 🎥 Demo
 
-Record a short demonstration (3–5 minutes) showing:
-
-* Receiving a patient message
-* AI interpretation
-* Appointment scheduling
-* Storage update
-* WhatsApp reply
-* Error handling
-
-Add the recording to the repository or link to YouTube.
+A short walkthrough demonstrating the complete workflow will be added soon.
 
 ---
 
 # 🔮 Future Improvements
 
-Possible enhancements include:
-
 * PostgreSQL storage backend
-* Calendar integration
+* Google Calendar integration
 * Multi-clinic support
-* Authentication and user roles
+* Authentication & authorization
 * Analytics dashboard
 * Automated workflow testing
 
@@ -196,10 +191,12 @@ Possible enhancements include:
 
 # 📄 License
 
-This project is released under the MIT License.
+This project is licensed under the MIT License.
 
 ---
 
 # 👨‍💻 Author
 
-Created as a portfolio project to demonstrate workflow architecture, automation design, and AI-powered business process automation using n8n.
+**Taleb Rkik**
+
+Built as a portfolio project to demonstrate automation architecture, workflow orchestration, and AI-powered business process automation using n8n.
